@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role { OWNER ADMIN EXAMINER REVIEWER TEAM_MEMBER CLIENT_ADMIN CLIENT_CONTRIBUTOR CLIENT_VIEWER }
+enum EngagementStatus { DRAFT ACCEPTANCE PLANNING FIELDWORK REVIEW COMPLETION SIGNED ARCHIVED DECLINED }
+enum WorkStatus { NOT_STARTED IN_PROGRESS PREPARED REVIEWED NOT_APPLICABLE }
+enum RequestStatus { DRAFT SENT VIEWED PART_RECEIVED RECEIVED ACCEPTED REJECTED CLOSED OVERDUE }
+enum NoteStatus { OPEN RESPONDED CLEARED }
+enum SignOffType { PREPARED REVIEWED APPROVED SIGNED }
+enum FindingSeverity { LOW MEDIUM HIGH MATERIAL_SIGNIFICANCE }
+
+model Tenant {
+  id              String           @id @default(cuid())
+  name            String
+  retentionYears  Int              @default(6)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  memberships     Membership[]
+  clients         Client[]
+  engagements     Engagement[]
+  auditEvents     AuditEvent[]
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String
+  mfaEnrolledAt   DateTime?
+  disabledAt      DateTime?
+  createdAt       DateTime         @default(now())
+  memberships     Membership[]
+  assignments     Assignment[]
+  comments        Comment[]
+  reviewNotes     ReviewNote[]      @relation("NoteAuthor")
+  clearedNotes    ReviewNote[]      @relation("NoteClearer")
+  signOffs        SignOff[]
+  documents       Document[]
+}
+
+model Membership {
+  id              String           @id @default(cuid())
+  tenantId        String
+  userId          String
+  role            Role
+  clientId        String?
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client          Client?          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, userId, clientId])
+  @@index([tenantId, role])
+}
+
+model Client {
+  id              String           @id @default(cuid())
+  tenantId        String
+  name            String
+  charityNumber   String?
+  companyNumber   String?
+  legalForm       String
+  registeredIn    String           @default("England and Wales")
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships     Membership[]
+  engagements     Engagement[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  @@unique([tenantId, charityNumber])
+}
+
+model Engagement {
+  id              String           @id @default(cuid())
+  tenantId        String
+  clientId        String
+  periodStart     DateTime
+  periodEnd       DateTime
+  accountingBasis String
+  grossIncome     Decimal          @db.Decimal(18, 2)
+  grossAssets     Decimal          @db.Decimal(18, 2)
+  materiality     Decimal?         @db.Decimal(18, 2)
+  status          EngagementStatus @default(DRAFT)
+  lockedAt        DateTime?
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  assignments     Assignment[]
+  tasks           Task[]
+  requests        EvidenceRequest[]
+  findings        Finding[]
+  documents       Document[]
+  comments        Comment[]
+  reviewNotes     ReviewNote[]
+  signOffs        SignOff[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  @@unique([tenantId, clientId, periodEnd])
+  @@index([tenantId, status])
+}
+
+model Assignment {
+  id              String           @id @default(cuid())
+  engagementId    String
+  userId          String
+  role            Role
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@unique([engagementId, userId])
+}
+
+model Task {
+  id              String           @id @default(cuid())
+  engagementId    String
+  direction       Int?
+  code            String
+  title           String
+  objective       String
+  mandatory       Boolean          @default(true)
+  status          WorkStatus       @default(NOT_STARTED)
+  conclusion      String?
+  version         Int              @default(1)
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  workpapers      Workpaper[]
+  signOffs        SignOff[]
+  reviewNotes     ReviewNote[]
+  comments        Comment[]
+  @@unique([engagementId, code])
+  @@index([engagementId, status])
+}
+
+model Workpaper {
+  id              String           @id @default(cuid())
+  taskId          String
+  title           String
+  currentVersion  Int              @default(1)
+  task            Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  versions        WorkpaperVersion[]
+  documents       Document[]
+  comments        Comment[]
+  reviewNotes     ReviewNote[]
+}
+
+model WorkpaperVersion {
+  id              String           @id @default(cuid())
+  workpaperId     String
+  version         Int
+  content         Json
+  contentHash     String
+  createdById     String
+  createdAt       DateTime         @default(now())
+  workpaper       Workpaper        @relation(fields: [workpaperId], references: [id], onDelete: Restrict)
+  @@unique([workpaperId, version])
+}
+
+model EvidenceRequest {
+  id              String           @id @default(cuid())
+  engagementId    String
+  reference       String
+  title           String
+  description     String
+  dueAt           DateTime
+  status          RequestStatus    @default(DRAFT)
+  sentAt          DateTime?
+  closedAt        DateTime?
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  documents       Document[]
+  comments        Comment[]
+  @@unique([engagementId, reference])
+}
+
+model Document {
+  id              String           @id @default(cuid())
+  engagementId    String
+  requestId       String?
+  workpaperId     String?
+  uploadedById    String
+  fileName        String
+  mimeType        String
+  byteSize        BigInt
+  storageKey      String           @unique
+  sha256          String
+  malwareStatus   String           @default("PENDING")
+  createdAt       DateTime         @default(now())
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+  request         EvidenceRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  workpaper       Workpaper?       @relation(fields: [workpaperId], references: [id], onDelete: SetNull)
+  uploadedBy      User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  @@index([engagementId, createdAt])
+}
+
+model Comment {
+  id              String           @id @default(cuid())
+  engagementId    String
+  taskId          String?
+  workpaperId     String?
+  requestId       String?
+  authorId        String
+  body            String
+  createdAt       DateTime         @default(now())
+  editedAt        DateTime?
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  task            Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workpaper       Workpaper?       @relation(fields: [workpaperId], references: [id], onDelete: Cascade)
+  request         EvidenceRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author          User             @relation(fields: [authorId], references: [id], onDelete: Restrict)
+}
+
+model ReviewNote {
+  id              String           @id @default(cuid())
+  engagementId    String
+  taskId          String?
+  workpaperId     String?
+  raisedById      String
+  clearedById     String?
+  severity        FindingSeverity
+  text            String
+  response        String?
+  status          NoteStatus       @default(OPEN)
+  raisedAt        DateTime         @default(now())
+  clearedAt       DateTime?
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  task            Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workpaper       Workpaper?       @relation(fields: [workpaperId], references: [id], onDelete: Cascade)
+  raisedBy        User             @relation("NoteAuthor", fields: [raisedById], references: [id], onDelete: Restrict)
+  clearedBy       User?            @relation("NoteClearer", fields: [clearedById], references: [id], onDelete: Restrict)
+}
+
+model Finding {
+  id              String           @id @default(cuid())
+  engagementId    String
+  title           String
+  description     String
+  severity        FindingSeverity
+  corrected       Boolean          @default(false)
+  reportImpact    String?
+  regulatorReportRequired Boolean?
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+}
+
+model SignOff {
+  id              String           @id @default(cuid())
+  engagementId    String
+  taskId          String?
+  userId          String
+  type            SignOffType
+  statement       String
+  snapshotHash    String
+  signedAt        DateTime         @default(now())
+  revokedAt       DateTime?
+  revocationReason String?
+  engagement      Engagement       @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+  task            Task?            @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@index([engagementId, type])
+}
+
+model AuditEvent {
+  id              String           @id @default(cuid())
+  tenantId        String
+  actorId         String?
+  action          String
+  entityType      String
+  entityId        String
+  beforeHash      String?
+  afterHash       String?
+  metadata        Json
+  ipHash          String?
+  occurredAt      DateTime         @default(now())
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId, occurredAt])
+  @@index([entityType, entityId])
+}
