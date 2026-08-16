@@ -53,6 +53,7 @@ import type {
   JurisdictionRuleSet,
   OrganisationType,
   Procedure,
+  PublicId,
   ReviewNote,
   Task,
   TeamMember,
@@ -116,9 +117,9 @@ const nav = [
 export function OperationalWorkspace() {
   const [state, setState] = useState<AppState | null>(null),
     [view, setView] = useState<View>("portfolio"),
-    [engagementId, setEngagementId] = useState<number | null>(null),
-    [taskId, setTaskId] = useState<number | null>(null),
-    [clientId, setClientId] = useState<number | null>(null),
+    [engagementId, setEngagementId] = useState<PublicId | null>(null),
+    [taskId, setTaskId] = useState<PublicId | null>(null),
+    [clientId, setClientId] = useState<PublicId | null>(null),
     [clientSection, setClientSection] = useState<ClientSection>("permanent"),
     [query, setQuery] = useState(""),
     [toast, setToast] = useState(""),
@@ -192,13 +193,13 @@ export function OperationalWorkspace() {
       conversationUnread(state, thread.id),
     ).length,
     openNotes = state.notes.filter((n) => n.status !== "CLEARED");
-  const go = (id: number) => {
+  const go = (id: PublicId) => {
     setEngagementId(id);
     setTaskId(state.tasks.find((t) => t.engagementId === id)?.id ?? null);
     setView("engagement");
     setQuery("");
   };
-  const goClient = (id: number, section: ClientSection = "permanent") => {
+  const goClient = (id: PublicId, section: ClientSection = "permanent") => {
     setClientId(id);
     setClientSection(section);
     setView("clients");
@@ -623,7 +624,7 @@ function Portfolio({
 }: {
   state: AppState;
   query: string;
-  open: (id: number) => void;
+  open: (id: PublicId) => void;
   create: () => void;
 }) {
   const rows = state.engagements.filter((e) =>
@@ -746,7 +747,7 @@ function EngagementView({
   state: AppState;
   engagement: Engagement;
   task: Task;
-  setTaskId: (id: number) => void;
+  setTaskId: (id: PublicId) => void;
   mutate: Mutate;
   notify: Notify;
   edit: () => void;
@@ -758,7 +759,12 @@ function EngagementView({
   const tasks = state.tasks.filter((t) => t.engagementId === engagement.id),
     procedures = state.procedures.filter((p) => p.taskId === task.id);
   const save = async (status = task.status) => {
-    await mutate("saveTask", { taskId: task.id, conclusion, status });
+    await mutate("saveTask", {
+      taskId: task.id,
+      rowVersion: task.rowVersion,
+      conclusion,
+      status,
+    });
     notify(`Task ${task.direction} saved as ${label(status)}`);
   };
   return (
@@ -1384,6 +1390,7 @@ function ProcedureWorkpaper({
   const save = async (status = procedure.status) => {
     await mutate("saveProcedure", {
       procedureId: procedure.id,
+      rowVersion: procedure.rowVersion,
       evidenceSummary: evidence,
       workPerformed: work,
       conclusion,
@@ -1780,8 +1787,8 @@ function Requests({
   detail,
 }: {
   state: AppState;
-  engagementId: number;
-  select: (id: number) => void;
+  engagementId: PublicId;
+  select: (id: PublicId) => void;
   create: () => void;
   detail: (r: EvidenceRequest) => void;
 }) {
@@ -1874,14 +1881,14 @@ function Findings({
 }: {
   state: AppState;
   engagement: Engagement;
-  select: (id: number) => void;
+  select: (id: PublicId) => void;
   mutate: Mutate;
   notify: Notify;
 }) {
   const rows = state.concerns
     .filter((item) => item.engagementId === engagement.id)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const [selectedId, setSelectedId] = useState<number | null>(rows[0]?.id ?? null),
+  const [selectedId, setSelectedId] = useState<PublicId | null>(rows[0]?.id ?? null),
     [search, setSearch] = useState(""),
     [status, setStatus] = useState("ALL"),
     [severity, setSeverity] = useState("ALL"),
@@ -1943,7 +1950,7 @@ function Findings({
               });
               const created = next.concerns
                 .filter((item) => item.engagementId === engagement.id)
-                .sort((a, b) => b.id - a.id)[0];
+                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
               setSelectedId(created?.id ?? null);
               setCreating(false);
               notify("Concern created in the controlled register");
@@ -2063,8 +2070,8 @@ function Review({
   notify,
 }: {
   state: AppState;
-  engagementId: number;
-  select: (id: number) => void;
+  engagementId: PublicId;
+  select: (id: PublicId) => void;
   create: () => void;
   clear: (n: ReviewNote) => void;
   mutate: Mutate;
@@ -2338,6 +2345,7 @@ function Reporting({
                   onClick={async () => {
                     await mutate("lockEngagement", {
                       engagementId: engagement.id,
+                      rowVersion: engagement.rowVersion,
                     });
                     notify("Annual file locked");
                   }}
@@ -2369,6 +2377,7 @@ function Reporting({
                   onClick={async () => {
                     await mutate("reopenEngagement", {
                       engagementId: engagement.id,
+                      rowVersion: engagement.rowVersion,
                       reason: reopenReason,
                     });
                     setReopenReason("");
@@ -2488,9 +2497,9 @@ function Clients({
   openAnnual,
 }: {
   state: AppState;
-  selectedId: number;
+  selectedId: PublicId;
   section: ClientSection;
-  selectClient: (id: number) => void;
+  selectClient: (id: PublicId) => void;
   selectSection: (section: ClientSection) => void;
   create: () => void;
   edit: (c: Client) => void;
@@ -2499,7 +2508,7 @@ function Clients({
   addUser: (c: Client) => void;
   mutate: Mutate;
   notify: Notify;
-  openAnnual: (id: number) => void;
+  openAnnual: (id: PublicId) => void;
 }) {
   const client =
     state.clients.find((c) => c.id === selectedId) ?? state.clients[0];
@@ -3951,13 +3960,13 @@ function EngSelect({
   change,
 }: {
   state: AppState;
-  value: number;
-  change: (id: number) => void;
+  value: PublicId;
+  change: (id: PublicId) => void;
 }) {
   return (
     <label className="engagement-select">
       Engagement
-      <select value={value} onChange={(e) => change(Number(e.target.value))}>
+      <select value={value} onChange={(e) => change(e.target.value)}>
         {state.engagements.map((e) => (
           <option value={e.id} key={e.id}>
             {e.clientName} · {fmtDate(e.periodEnd)}
@@ -4232,7 +4241,7 @@ function initials(v: string) {
     .join("")
     .toUpperCase();
 }
-function conversationUnread(state: AppState, threadId: number) {
+function conversationUnread(state: AppState, threadId: PublicId) {
   const participant = state.conversationParticipants.find(
     (item) =>
       item.threadId === threadId &&
@@ -4250,7 +4259,7 @@ function conversationUnread(state: AppState, threadId: number) {
       (!participant?.lastReadAt || incoming.createdAt > participant.lastReadAt),
   );
 }
-function progress(s: AppState, id: number) {
+function progress(s: AppState, id: PublicId) {
   const t = s.tasks.filter((x) => x.engagementId === id);
   if (!t.length) return 0;
   return Math.round(

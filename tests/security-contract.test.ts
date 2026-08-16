@@ -20,12 +20,9 @@ test("production identity has no named-user fallback", async () => {
   assert.doesNotMatch(source, /preview@clarity\.ie" \}/);
 });
 
-test("development state reads initialise preview data before rendering", async () => {
+test("request handlers never initialise development fixture data", async () => {
   const route = await readFile("app/api/state/route.ts", "utf8");
-  assert.match(
-    route,
-    /export async function GET\(\) \{\s*try \{\s*await seedIfEmpty\(\);/,
-  );
+  assert.doesNotMatch(route, /seedIfEmpty/);
 });
 
 test("client state applies engagement and request filtering", async () => {
@@ -46,14 +43,20 @@ test("client state applies engagement and request filtering", async () => {
 });
 
 test("client conversations and files require assignment or portal administration", async () => {
-  const [state, files] = await Promise.all([
+  const [state, serverData, communications, files] = await Promise.all([
     readFile("app/api/state/route.ts", "utf8"),
+    readFile("lib/server-data.ts", "utf8"),
+    readFile("lib/state-actions/communications.ts", "utf8"),
     readFile("app/api/files/route.ts", "utf8"),
   ]);
-  assert.match(state, /This conversation is not assigned to the signed-in account/);
+  assert.match(state, /handleCommunicationAction/);
+  assert.match(communications, /This conversation is not assigned to the signed-in account/);
   assert.match(files, /This evidence request is not assigned to the signed-in account/);
   assert.match(files, /This document is not assigned to the signed-in account/);
   assert.match(files, /s\.conversationParticipants\.email/);
+  assert.match(serverData, /conversationIds\.has\(row\.conversationThreadId\)/);
+  assert.match(serverData, /row\.conversationMessageId\s*!==\s*null/);
+  assert.match(files, /This attachment has not been sent/);
 });
 
 test("uploads record signature-verification status rather than a false clean status", async () => {
@@ -62,8 +65,20 @@ test("uploads record signature-verification status rather than a false clean sta
   assert.doesNotMatch(source, /malwareStatus:\s*"STORED"/);
 });
 
+test("file uploads batch database writes with audit and compensate object storage failures", async () => {
+  const source = await readFile("app/api/files/route.ts", "utf8");
+  assert.match(source, /prepareAuditInsert/);
+  assert.match(source, /statement:\s*permanentAudit/);
+  assert.match(source, /statement:\s*documentAudit/);
+  assert.match(source, /db\.batch\(\[permanentInsert, permanentAudit\]\)/);
+  assert.match(source, /deleteObjectAfterFailedWrite\(key\)/);
+  assert.doesNotMatch(source, /document:\s*\{\s*\.\.\.doc/);
+});
+
 test("audit records are hash chained", async () => {
   const source = await readFile("lib/server-data.ts", "utf8");
   assert.match(source, /previousHash: previous/);
   assert.match(source, /eventHash/);
+  assert.match(source, /const \{ statement \} = await prepareAuditInsert/);
+  assert.match(source, /await statement;/);
 });

@@ -13,6 +13,7 @@ import {
 } from "../lib/authz";
 
 const admin: Principal = {
+  tenantId: "tenant-a",
   kind: "INTERNAL",
   email: "admin@example.org",
   name: "Admin",
@@ -21,6 +22,7 @@ const admin: Principal = {
   clientRoles: {},
 };
 const preparer: Principal = {
+  tenantId: "tenant-a",
   kind: "INTERNAL",
   email: "prepare@example.org",
   name: "Preparer",
@@ -29,6 +31,7 @@ const preparer: Principal = {
   clientRoles: {},
 };
 const reviewer: Principal = {
+  tenantId: "tenant-a",
   kind: "INTERNAL",
   email: "review@example.org",
   name: "Reviewer",
@@ -37,6 +40,7 @@ const reviewer: Principal = {
   clientRoles: {},
 };
 const contributor: Principal = {
+  tenantId: "tenant-a",
   kind: "CLIENT",
   email: "client@example.org",
   name: "Client",
@@ -63,9 +67,10 @@ test("preparers cannot perform reviewer actions", () => {
 });
 
 test("client access is isolated to assigned clients", () => {
-  assert.equal(canAccessClient(contributor, 7), true);
-  assert.equal(canAccessClient(contributor, 8), false);
-  assert.equal(canAccessClient(admin, 8), true);
+  assert.equal(canAccessClient(contributor, 7, "tenant-a"), true);
+  assert.equal(canAccessClient(contributor, 8, "tenant-a"), false);
+  assert.equal(canAccessClient(admin, 8, "tenant-a"), true);
+  assert.equal(canAccessClient(admin, 8, "tenant-b"), false);
 });
 
 test("read-only client users cannot submit responses", () => {

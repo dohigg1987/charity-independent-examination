@@ -3,8 +3,10 @@ export type TaskStatus =
   | "IN_PROGRESS"
   | "PREPARED"
   | "REVIEWED";
+export type PublicId = string;
 export type Client = {
-  id: number;
+  id: PublicId;
+  publicId: PublicId;
   name: string;
   charityNumber: string;
   legalForm: string;
@@ -13,8 +15,9 @@ export type Client = {
   status: string;
 };
 export type Engagement = {
-  id: number;
-  clientId: number;
+  id: PublicId;
+  publicId: PublicId;
+  clientId: PublicId;
   clientName: string;
   charityNumber: string;
   periodEnd: string;
@@ -48,10 +51,12 @@ export type Engagement = {
   reopenedAt: string | null;
   reopenedBy: string | null;
   reopenReason: string | null;
+  rowVersion: number;
 };
 export type Task = {
-  id: number;
-  engagementId: number;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
   direction: number;
   title: string;
   objective: string;
@@ -64,10 +69,12 @@ export type Task = {
   preparedAt: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  rowVersion: number;
 };
 export type Procedure = {
-  id: number;
-  taskId: number;
+  id: PublicId;
+  publicId: PublicId;
+  taskId: PublicId;
   sequence: number;
   text: string;
   guidance: string;
@@ -86,12 +93,14 @@ export type Procedure = {
   completed: boolean;
   completedBy: string | null;
   completedAt: string | null;
+  rowVersion: number;
 };
 export type EvidenceRequest = {
-  id: number;
-  engagementId: number;
-  taskId: number | null;
-  procedureId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  taskId: PublicId | null;
+  procedureId: PublicId | null;
   reference: string;
   title: string;
   description: string;
@@ -103,10 +112,11 @@ export type EvidenceRequest = {
   receivedAt: string | null;
 };
 export type Comment = {
-  id: number;
-  engagementId: number;
-  taskId: number | null;
-  requestId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  taskId: PublicId | null;
+  requestId: PublicId | null;
   authorEmail: string;
   authorName: string;
   visibility: string;
@@ -114,9 +124,10 @@ export type Comment = {
   createdAt: string;
 };
 export type ConversationThread = {
-  id: number;
-  engagementId: number;
-  requestId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  requestId: PublicId | null;
   subject: string;
   category: "GENERAL" | "EVIDENCE" | "GOVERNANCE" | "REPORTING" | "TECHNICAL";
   priority: "NORMAL" | "HIGH" | "URGENT";
@@ -130,8 +141,9 @@ export type ConversationThread = {
   updatedAt: string;
 };
 export type ConversationParticipant = {
-  id: number;
-  threadId: number;
+  id: PublicId;
+  publicId: PublicId;
+  threadId: PublicId;
   email: string;
   name: string;
   participantType: "PRACTICE" | "CLIENT";
@@ -140,9 +152,10 @@ export type ConversationParticipant = {
   createdAt: string;
 };
 export type ConversationMessage = {
-  id: number;
-  threadId: number;
-  replyToMessageId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  threadId: PublicId;
+  replyToMessageId: PublicId | null;
   authorEmail: string;
   authorName: string;
   authorType: "PRACTICE" | "CLIENT" | "SYSTEM";
@@ -151,9 +164,10 @@ export type ConversationMessage = {
   createdAt: string;
 };
 export type ReviewNote = {
-  id: number;
-  engagementId: number;
-  taskId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  taskId: PublicId | null;
   reference: string;
   title: string;
   body: string;
@@ -165,14 +179,15 @@ export type ReviewNote = {
   createdAt: string;
 };
 export type DocumentRecord = {
-  id: number;
-  engagementId: number;
-  requestId: number | null;
-  taskId: number | null;
-  procedureId: number | null;
-  concernId: number | null;
-  conversationThreadId: number | null;
-  conversationMessageId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  requestId: PublicId | null;
+  taskId: PublicId | null;
+  procedureId: PublicId | null;
+  concernId: PublicId | null;
+  conversationThreadId: PublicId | null;
+  conversationMessageId: PublicId | null;
   fileSection: string;
   fileName: string;
   mimeType: string;
@@ -183,8 +198,9 @@ export type DocumentRecord = {
   createdAt: string;
 };
 export type PermanentDocument = {
-  id: number;
-  clientId: number;
+  id: PublicId;
+  publicId: PublicId;
+  clientId: PublicId;
   category: string;
   fileName: string;
   mimeType: string;
@@ -195,8 +211,9 @@ export type PermanentDocument = {
   createdAt: string;
 };
 export type AuditEvent = {
-  id: number;
-  engagementId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId | null;
   actorEmail: string;
   action: string;
   entityType: string;
@@ -205,7 +222,8 @@ export type AuditEvent = {
   createdAt: string;
 };
 export type TeamMember = {
-  id: number;
+  id: PublicId;
+  publicId: PublicId;
   email: string;
   name: string;
   role: string;
@@ -213,8 +231,9 @@ export type TeamMember = {
   createdAt: string;
 };
 export type WorkpaperVersion = {
-  id: number;
-  taskId: number;
+  id: PublicId;
+  publicId: PublicId;
+  taskId: PublicId;
   version: number;
   conclusion: string;
   status: string;
@@ -223,10 +242,11 @@ export type WorkpaperVersion = {
   createdAt: string;
 };
 export type Signoff = {
-  id: number;
-  engagementId: number;
-  taskId: number | null;
-  procedureId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  taskId: PublicId | null;
+  procedureId: PublicId | null;
   type: string;
   statement: string;
   snapshotHash: string;
@@ -234,8 +254,9 @@ export type Signoff = {
   signedAt: string;
 };
 export type Trustee = {
-  id: number;
-  clientId: number;
+  id: PublicId;
+  publicId: PublicId;
+  clientId: PublicId;
   personType: string;
   name: string;
   email: string | null;
@@ -246,8 +267,9 @@ export type Trustee = {
   createdAt: string;
 };
 export type ClientUser = {
-  id: number;
-  clientId: number;
+  id: PublicId;
+  publicId: PublicId;
+  clientId: PublicId;
   name: string;
   email: string;
   role: string;
@@ -256,10 +278,11 @@ export type ClientUser = {
   createdAt: string;
 };
 export type Concern = {
-  id: number;
-  engagementId: number;
-  taskId: number | null;
-  procedureId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  taskId: PublicId | null;
+  procedureId: PublicId | null;
   reference: string;
   sourceType: string;
   category: string;
@@ -289,9 +312,10 @@ export type Concern = {
   updatedAt: string;
 };
 export type ConcernEvent = {
-  id: number;
-  concernId: number;
-  engagementId: number;
+  id: PublicId;
+  publicId: PublicId;
+  concernId: PublicId;
+  engagementId: PublicId;
   eventType: string;
   body: string;
   metadata: string;
@@ -300,7 +324,6 @@ export type ConcernEvent = {
   createdAt: string;
 };
 export type PracticeSettings = {
-  id: number;
   concernReviewMode: string;
   requireIndependentConcernClosure: boolean;
   allowProcedureSelfReview: boolean;
@@ -311,8 +334,9 @@ export type PracticeSettings = {
   updatedAt: string;
 };
 export type FileLockEvent = {
-  id: number;
-  engagementId: number;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
   action: string;
   reason: string;
   snapshotHash: string;
@@ -320,9 +344,10 @@ export type FileLockEvent = {
   createdAt: string;
 };
 export type TbImport = {
-  id: number;
-  engagementId: number;
-  documentId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  documentId: PublicId | null;
   version: number;
   fileName: string;
   sourceFormat: string;
@@ -342,8 +367,9 @@ export type TbImport = {
   createdAt: string;
 };
 export type TbAccount = {
-  id: number;
-  tbImportId: number;
+  id: PublicId;
+  publicId: PublicId;
+  tbImportId: PublicId;
   accountCode: string;
   accountName: string;
   fund: string;
@@ -358,10 +384,11 @@ export type TbAccount = {
   createdAt: string;
 };
 export type TbAnalytic = {
-  id: number;
-  engagementId: number;
-  tbImportId: number;
-  accountId: number | null;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  tbImportId: PublicId;
+  accountId: PublicId | null;
   type: string;
   title: string;
   expectation: string;
@@ -375,9 +402,9 @@ export type TbAnalytic = {
   explanation: string;
   targetedWork: string;
   conclusion: string;
-  linkedTaskId: number | null;
-  linkedProcedureId: number | null;
-  concernId: number | null;
+  linkedTaskId: PublicId | null;
+  linkedProcedureId: PublicId | null;
+  concernId: PublicId | null;
   preparedBy: string | null;
   preparedAt: string | null;
   reviewedBy: string | null;
@@ -385,9 +412,10 @@ export type TbAnalytic = {
   createdAt: string;
 };
 export type TbReconciliation = {
-  id: number;
-  engagementId: number;
-  tbImportId: number;
+  id: PublicId;
+  publicId: PublicId;
+  engagementId: PublicId;
+  tbImportId: PublicId;
   statementLine: string;
   tbAmount: number;
   accountsAmount: number;
@@ -445,16 +473,17 @@ export type OrganisationType = {
   updatedAt: string;
 };
 export type AppState = {
+  practiceName: string;
   actor: {
     kind: "INTERNAL" | "CLIENT";
     name: string;
     email: string;
     role: string;
-    clientIds: number[];
-    clientRoles?: Record<number, string>;
+    clientIds: PublicId[];
+    clientRoles?: Record<PublicId, string>;
   };
   portalProgress?: Array<{
-    engagementId: number;
+    engagementId: PublicId;
     totalTasks: number;
     reviewedTasks: number;
   }>;

@@ -21,6 +21,7 @@ import type {
   ConversationMessage,
   ConversationThread,
   Engagement,
+  PublicId,
 } from "@/lib/types";
 
 export function ClientMessages({
@@ -35,11 +36,11 @@ export function ClientMessages({
   engagement: Engagement;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
-  initialThreadId?: number | null;
+  initialThreadId?: PublicId | null;
   canRespond: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(() => {
+  const [selectedId, setSelectedId] = useState<PublicId | null>(() => {
     if (initialThreadId) return initialThreadId;
     return (
       state.conversations
@@ -162,7 +163,7 @@ function ClientThread({
     setBusy(true);
     setError("");
     try {
-      const attachmentIds: number[] = [];
+      const attachmentIds: PublicId[] = [];
       if (file) {
         const form = new FormData();
         form.set("file", file);
@@ -215,7 +216,7 @@ function ClientThread({
                 {replied && <blockquote><strong>{replied.authorName}</strong>{replied.body}</blockquote>}
                 <p>{item.body}</p>
                 {attachments.map((document) => <a className="message-attachment" href={`/api/files?id=${document.id}`} title={`Download ${document.fileName}`} key={document.id}><FileText /><span><strong>{document.fileName}</strong><small>{Math.ceil(document.byteSize / 1024)} KB · Receipt {document.sha256.slice(0, 12).toUpperCase()}</small></span></a>)}
-                <footer><time>{dateTime(item.createdAt)}</time>{mine && item.authorType !== "SYSTEM" && <span><CheckCircle2 /> Delivered</span>}{item.authorType !== "SYSTEM" && <button onClick={() => setReplyTo(item)}><Reply /> Reply</button>}</footer>
+                <footer><time>{dateTime(item.createdAt)}</time>{mine && item.authorType !== "SYSTEM" && <span><CheckCircle2 /> {messageReceipt(state, item)}</span>}{item.authorType !== "SYSTEM" && <button onClick={() => setReplyTo(item)}><Reply /> Reply</button>}</footer>
               </div>
             </div>
           );
@@ -254,7 +255,7 @@ function NewClientConversation({
   refresh: () => Promise<void>;
   notify: (message: string) => void;
   close: () => void;
-  selectThread: (id: number | null) => void;
+  selectThread: (id: PublicId | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -392,9 +393,10 @@ async function action(name: string, payload: Record<string, unknown>) {
   return result as AppState;
 }
 
-function messagesFor(state: AppState, threadId: number) { return state.conversationMessages.filter((message) => message.threadId === threadId); }
-function practiceParticipant(state: AppState, threadId: number) { return state.conversationParticipants.find((participant) => participant.threadId === threadId && participant.participantType === "PRACTICE"); }
+function messagesFor(state: AppState, threadId: PublicId) { return state.conversationMessages.filter((message) => message.threadId === threadId); }
+function practiceParticipant(state: AppState, threadId: PublicId) { return state.conversationParticipants.find((participant) => participant.threadId === threadId && participant.participantType === "PRACTICE"); }
 function unread(state: AppState, thread: ConversationThread) { const participant = state.conversationParticipants.find((item) => item.threadId === thread.id && item.email.toLowerCase() === state.actor.email.toLowerCase()); const incoming = messagesFor(state, thread.id).filter((item) => item.authorEmail.toLowerCase() !== state.actor.email.toLowerCase()).at(-1); return Boolean(incoming && (!participant?.lastReadAt || incoming.createdAt > participant.lastReadAt)); }
+function messageReceipt(state: AppState, message: ConversationMessage) { const read = state.conversationParticipants.some((participant) => participant.threadId === message.threadId && participant.email.toLowerCase() !== message.authorEmail.toLowerCase() && Boolean(participant.lastReadAt && participant.lastReadAt >= message.createdAt)); return read ? "Read" : "Sent"; }
 function initials(value: string) { return value.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "IE"; }
 function label(value: string) { return value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()); }
 function dateTime(value: string) { return new Date(value.endsWith("Z") ? value : `${value}Z`).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }

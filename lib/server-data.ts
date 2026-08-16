@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import * as s from "@/db/schema";
-import { directions } from "@/lib/work-programme";
+import { externaliseAuditPayload, externaliseState } from "@/lib/public-ids";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import {
   AccessDeniedError,
@@ -10,6 +10,11 @@ import {
   normaliseRole,
 } from "@/lib/authz";
 import { assessConfiguredEligibility } from "@/lib/eligibility";
+import {
+  DEVELOPMENT_TENANT_ID,
+  resolveClientMemberships,
+  resolveInternalMembership,
+} from "@/lib/tenancy";
 
 export async function applicableRuleSet(
   jurisdictionCode: string,
@@ -114,6 +119,7 @@ export async function actor(): Promise<Principal> {
   if (!user) {
     if (process.env.NODE_ENV !== "production") {
       return {
+        tenantId: DEVELOPMENT_TENANT_ID,
         kind: "INTERNAL",
         name: "Dennis O'Higgins",
         email: "preview@clarity.ie",
@@ -125,14 +131,7 @@ export async function actor(): Promise<Principal> {
     throw new AuthenticationRequiredError();
   }
   const email = user.email.trim().toLowerCase();
-  const db = getDb();
-  const internal = (
-    await db
-      .select()
-      .from(s.users)
-      .where(and(eq(s.users.email, email), eq(s.users.status, "ACTIVE")))
-      .limit(1)
-  )[0];
+  const internal = await resolveInternalMembership(email);
   const internalRole = internal ? normaliseRole(internal.role) : null;
   if (
     internal &&
@@ -142,6 +141,7 @@ export async function actor(): Promise<Principal> {
     )
   ) {
     return {
+      tenantId: internal.tenantId,
       kind: "INTERNAL",
       name: internal.name,
       email,
@@ -150,12 +150,7 @@ export async function actor(): Promise<Principal> {
       clientRoles: {},
     };
   }
-  const memberships = await db
-    .select()
-    .from(s.clientUsers)
-    .where(
-      and(eq(s.clientUsers.email, email), eq(s.clientUsers.status, "ACTIVE")),
-    );
+  const memberships = await resolveClientMemberships(email);
   if (memberships.length) {
     const roles = memberships.map((membership) => ({
       clientId: membership.clientId,
@@ -173,6 +168,7 @@ export async function actor(): Promise<Principal> {
     ) as Principal["clientRoles"];
     const role = clientRoles[memberships[0].clientId]!;
     return {
+      tenantId: memberships[0].tenantId,
       kind: "CLIENT",
       name: memberships[0].name || user.displayName,
       email,
@@ -186,333 +182,72 @@ export async function actor(): Promise<Principal> {
   );
 }
 
-export async function seedIfEmpty() {
-  if (process.env.NODE_ENV === "production") return;
+export async function prepareAuditInsert(
+  tenantId: string,
+  engagementId: number | null,
+  actorEmail: string,
+  action: string,
+  entityType: string,
+  entityId: string,
+  detail: unknown,
+) {
   const db = getDb();
-  const existing = await db
-    .select({ id: s.clients.id })
-    .from(s.clients)
-    .limit(1);
-  if (existing.length) return;
-  const insertedClients = await db
-    .insert(s.clients)
-    .values([
-      {
-        name: "Willow Community Foundation",
-        charityNumber: "1187421",
-        legalForm: "CIO",
-        contactName: "Sarah Whitfield",
-        contactEmail: "sarah@willow.example",
-      },
-      {
-        name: "Harbour Youth Trust",
-        charityNumber: "1162089",
-        legalForm: "Charitable company",
-        contactName: "James Okoro",
-        contactEmail: "james@harbour.example",
-      },
-      {
-        name: "Oakfield Arts Collective",
-        charityNumber: "1200194",
-        legalForm: "CIO",
-        contactName: "Amelia Rhodes",
-        contactEmail: "amelia@oakfield.example",
-      },
-      {
-        name: "Beacon Wellbeing CIO",
-        charityNumber: "1193450",
-        legalForm: "CIO",
-        contactName: "Mina Shah",
-        contactEmail: "mina@beacon.example",
-      },
-    ])
-    .returning();
-  await db.insert(s.users).values([
-    {
-      email: "preview@clarity.ie",
-      name: "Dennis O'Higgins",
-      role: "INDEPENDENT_EXAMINER",
-      status: "ACTIVE",
-    },
-    {
-      email: "joanne@clarity.ie",
-      name: "Joanne Mercer",
-      role: "REVIEWER",
-      status: "ACTIVE",
-    },
-  ]);
-  const willow = insertedClients[0];
-  const insertedEngagements = await db
-    .insert(s.engagements)
-    .values([
-      {
-        clientId: willow.id,
-        periodEnd: "2026-03-31",
-        accountingBasis: "Accruals",
-        grossIncome: 612400,
-        grossAssets: 1482000,
-        materiality: 12250,
-        risk: "STANDARD",
-        status: "FIELDWORK",
-      },
-      {
-        clientId: insertedClients[1].id,
-        periodEnd: "2026-04-30",
-        accountingBasis: "Accruals",
-        grossIncome: 342800,
-        grossAssets: 890000,
-        materiality: 6860,
-        risk: "LOW",
-        status: "REVIEW",
-        trusteeApproved: true,
-        materialSignificanceAssessed: true,
-      },
-      {
-        clientId: insertedClients[2].id,
-        periodEnd: "2026-05-31",
-        accountingBasis: "Receipts and payments",
-        grossIncome: 178900,
-        grossAssets: 410000,
-        materiality: 3580,
-        risk: "STANDARD",
-        status: "PLANNING",
-      },
-      {
-        clientId: insertedClients[3].id,
-        periodEnd: "2026-06-30",
-        accountingBasis: "Accruals",
-        grossIncome: 426000,
-        grossAssets: 920000,
-        materiality: 8520,
-        risk: "HIGH",
-        status: "CLIENT_INPUT",
-      },
-    ])
-    .returning();
-  const eng = insertedEngagements[0];
-  const insertedTasks = await db
-    .insert(s.tasks)
-    .values(
-      directions.map((d, index) => ({
-        engagementId: eng.id,
-        direction: d.id,
-        title: d.title,
-        objective: d.objective,
-        phase: d.phase,
-        guidance: `Applies to: ${d.applies}. Document the work performed, evidence obtained, significant judgements and conclusion in sufficient detail to support the independent examination.`,
-        status:
-          index < 4
-            ? "REVIEWED"
-            : index < 6
-              ? "PREPARED"
-              : index < 10
-                ? "IN_PROGRESS"
-                : "NOT_STARTED",
-        conclusion:
-          index < 6
-            ? `Direction ${d.id} procedures completed with no material exception, subject to the matters recorded in the workpaper.`
-            : "",
-      })),
-    )
-    .returning();
-  for (const task of insertedTasks) {
-    const direction = directions.find((d) => d.id === task.direction)!;
-    await db.insert(s.procedures).values(
-      direction.procedures.map((text, index) => ({
-        taskId: task.id,
-        sequence: index + 1,
-        text,
-        completed: task.direction < 6 || (task.direction === 6 && index < 2),
-        completedBy: task.direction < 7 ? "Dennis O'Higgins" : null,
-        completedAt: task.direction < 7 ? "2026-08-14T16:42:00Z" : null,
-      })),
-    );
+  if (engagementId) {
+    const engagement = (
+      await db
+        .select({ id: s.engagements.id })
+        .from(s.engagements)
+        .where(
+          and(
+            eq(s.engagements.id, engagementId),
+            eq(s.engagements.tenantId, tenantId),
+          ),
+        )
+        .limit(1)
+    )[0];
+    if (!engagement)
+      throw new AccessDeniedError("The audited record is outside this tenant");
   }
-  const seededProcedures = await db.select().from(s.procedures);
-  const seededRequests = await db.insert(s.evidenceRequests).values([
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[7].id,
-      procedureId: seededProcedures.find(
-        (p) => p.taskId === insertedTasks[7].id,
-      )?.id,
-      reference: "REQ-018",
-      title: "Restricted funds reconciliation",
-      description:
-        "Provide the year-end restricted funds reconciliation, including brought-forward balances, income, expenditure, transfers and closing balances.",
-      contactName: "Sarah Whitfield",
-      contactEmail: "sarah@willow.example",
-      dueDate: "2026-08-18",
-      status: "AWAITING_CLIENT",
-    },
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[6].id,
-      procedureId: seededProcedures.find(
-        (p) => p.taskId === insertedTasks[6].id,
-      )?.id,
-      reference: "REQ-017",
-      title: "Trustee declarations and interests",
-      description:
-        "Provide completed declarations of interests for every trustee serving during the year.",
-      contactName: "Sarah Whitfield",
-      contactEmail: "sarah@willow.example",
-      dueDate: "2026-08-14",
-      status: "OVERDUE",
-    },
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[5].id,
-      procedureId: seededProcedures.find(
-        (p) => p.taskId === insertedTasks[5].id,
-      )?.id,
-      reference: "REQ-016",
-      title: "July bank statement and reconciliation",
-      description:
-        "Provide the July bank statement and reconciliation supporting the March timing difference.",
-      contactName: "Sarah Whitfield",
-      contactEmail: "sarah@willow.example",
-      dueDate: "2026-08-20",
-      status: "RECEIVED",
-      receivedAt: "2026-08-14T10:06:00Z",
-    },
-  ]).returning();
-  const now = new Date().toISOString();
-  for (const request of seededRequests) {
-    const [thread] = await db.insert(s.conversationThreads).values({
-      engagementId: eng.id,
-      requestId: request.id,
-      subject: request.title,
-      category: "EVIDENCE",
-      priority: request.status === "OVERDUE" ? "HIGH" : "NORMAL",
-      status: request.status === "RECEIVED" ? "RESOLVED" : "WAITING_CLIENT",
-      assignedTo: "preview@clarity.ie",
-      createdBy: "preview@clarity.ie",
-      lastMessageAt: now,
-      resolvedAt: request.status === "RECEIVED" ? request.receivedAt : null,
-      resolvedBy: request.status === "RECEIVED" ? "preview@clarity.ie" : null,
-    }).returning();
-    await db.insert(s.conversationParticipants).values([
-      {
-        threadId: thread.id,
-        email: "preview@clarity.ie",
-        name: "Dennis O'Higgins",
-        participantType: "PRACTICE",
-        lastReadAt: now,
-      },
-      {
-        threadId: thread.id,
-        email: request.contactEmail,
-        name: request.contactName,
-        participantType: "CLIENT",
-      },
-    ]);
-    await db.insert(s.conversationMessages).values({
-      threadId: thread.id,
-      authorEmail: "preview@clarity.ie",
-      authorName: "Dennis O'Higgins",
-      authorType: "PRACTICE",
-      body: request.description,
-      createdAt: now,
-    });
-  }
-  const [generalThread] = await db.insert(s.conversationThreads).values({
-    engagementId: eng.id,
-    subject: "Year-end accounts and trustee approval timetable",
-    category: "REPORTING",
-    priority: "NORMAL",
-    status: "WAITING_PRACTICE",
-    assignedTo: "preview@clarity.ie",
-    createdBy: "sarah@willow.example",
-    lastMessageAt: "2026-08-15T14:22:00Z",
-  }).returning();
-  await db.insert(s.conversationParticipants).values([
-    {
-      threadId: generalThread.id,
-      email: "preview@clarity.ie",
-      name: "Dennis O'Higgins",
-      participantType: "PRACTICE",
-      lastReadAt: "2026-08-15T13:00:00Z",
-    },
-    {
-      threadId: generalThread.id,
-      email: "sarah@willow.example",
-      name: "Sarah Whitfield",
-      participantType: "CLIENT",
-      lastReadAt: "2026-08-15T14:22:00Z",
-    },
-  ]);
-  await db.insert(s.conversationMessages).values([
-    {
-      threadId: generalThread.id,
-      authorEmail: "preview@clarity.ie",
-      authorName: "Dennis O'Higgins",
-      authorType: "PRACTICE",
-      body: "The draft accounts are scheduled for final review this week. Please confirm the date of the trustees' approval meeting so the completion timetable can be aligned.",
-      createdAt: "2026-08-15T11:06:00Z",
-    },
-    {
-      threadId: generalThread.id,
-      authorEmail: "sarah@willow.example",
-      authorName: "Sarah Whitfield",
-      authorType: "CLIENT",
-      body: "The trustees are meeting on 26 August. Can the final draft and representation points be available by 22 August for circulation?",
-      createdAt: "2026-08-15T14:22:00Z",
-    },
-  ]);
-  await db.insert(s.comments).values([
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[5].id,
-      authorEmail: "joanne@clarity.ie",
-      authorName: "Joanne Mercer",
-      body: "Please reconcile the £1,240 variance to the post year-end bank statement and cross-reference the evidence.",
-    },
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[5].id,
-      authorEmail: "dennis@clarity.ie",
-      authorName: "Dennis O'Higgins",
-      body: "Request raised with Sarah. The statement is due on 20 August.",
-    },
-  ]);
-  await db.insert(s.reviewNotes).values([
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[1].id,
-      reference: "WP 2.1",
-      title: "Independence declaration",
-      body: "Document whether prior bookkeeping support creates a self-review threat.",
-      severity: "HIGH",
-      raisedBy: "Joanne Mercer",
-    },
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[5].id,
-      reference: "WP 6.2",
-      title: "Bank reconciliation difference",
-      body: "Obtain and cross-reference the post year-end statement.",
-      severity: "MEDIUM",
-      raisedBy: "Joanne Mercer",
-    },
-    {
-      engagementId: eng.id,
-      taskId: insertedTasks[10].id,
-      reference: "WP 11.3",
-      title: "Payroll variance",
-      body: "Expand the analytical expectation to reflect the April pay award.",
-      severity: "LOW",
-      raisedBy: "Joanne Mercer",
-    },
-  ]);
-  await audit(
-    eng.id,
-    "system@clarity.ie",
-    "ENGAGEMENT_SEEDED",
-    "engagement",
-    String(eng.id),
-    {},
+  const previous =
+    (
+      await db
+        .select({ eventHash: s.auditHeads.lastHash })
+        .from(s.auditHeads)
+        .where(eq(s.auditHeads.tenantId, tenantId))
+        .limit(1)
+    )[0]?.eventHash ?? null;
+  const createdAt = new Date().toISOString();
+  const external = await externaliseAuditPayload(
+    tenantId,
+    entityType,
+    entityId,
+    detail,
   );
+  const serialised = JSON.stringify(external.detail);
+  const eventHash = await snapshotHash({
+    previous,
+    engagementId,
+    actorEmail,
+    action,
+    entityType,
+    entityId: external.entityId,
+    detail: serialised,
+    createdAt,
+  });
+  return {
+    statement: db.insert(s.auditEvents).values({
+      tenantId,
+      engagementId,
+      actorEmail,
+      action,
+      entityType,
+      entityId: external.entityId,
+      detail: serialised,
+      previousHash: previous,
+      eventHash,
+      createdAt,
+    }),
+  };
 }
 
 export async function audit(
@@ -523,44 +258,30 @@ export async function audit(
   entityId: string,
   detail: unknown,
 ) {
-  const db = getDb();
-  const previous =
-    (
-      await db
-        .select({ eventHash: s.auditEvents.eventHash })
-        .from(s.auditEvents)
-        .orderBy(desc(s.auditEvents.id))
-        .limit(1)
-    )[0]?.eventHash ?? null;
-  const createdAt = new Date().toISOString();
-  const serialised = JSON.stringify(detail);
-  const eventHash = await snapshotHash({
-    previous,
+  const internalMembership = await resolveInternalMembership(actorEmail);
+  const clientMemberships = internalMembership
+    ? []
+    : await resolveClientMemberships(actorEmail);
+  const actorTenant =
+    internalMembership?.tenantId ?? clientMemberships[0]?.tenantId;
+  if (!actorTenant)
+    throw new AccessDeniedError("An auditable tenant context is required");
+  const { statement } = await prepareAuditInsert(
+    actorTenant,
     engagementId,
     actorEmail,
     action,
     entityType,
     entityId,
-    detail: serialised,
-    createdAt,
-  });
-  await db.insert(s.auditEvents).values({
-    engagementId,
-    actorEmail,
-    action,
-    entityType,
-    entityId,
-    detail: serialised,
-    previousHash: previous,
-    eventHash,
-    createdAt,
-  });
+    detail,
+  );
+  await statement;
 }
 
 export async function getState(principal?: Principal) {
-  await seedIfEmpty();
   const db = getDb();
   const currentActor = principal ?? (await actor());
+  const tenantId = currentActor.tenantId;
   const [
     clients,
     engagementRows,
@@ -591,11 +312,13 @@ export async function getState(principal?: Principal) {
     jurisdictionRuleSets,
     organisationTypes,
     practiceSettingsRows,
+    tenantRows,
   ] = await Promise.all([
-    db.select().from(s.clients),
+    db.select().from(s.clients).where(eq(s.clients.tenantId, tenantId)),
     db
       .select({
         id: s.engagements.id,
+        publicId: s.engagements.publicId,
         clientId: s.engagements.clientId,
         clientName: s.clients.name,
         charityNumber: s.clients.charityNumber,
@@ -631,20 +354,29 @@ export async function getState(principal?: Principal) {
         reopenedAt: s.engagements.reopenedAt,
         reopenedBy: s.engagements.reopenedBy,
         reopenReason: s.engagements.reopenReason,
+        rowVersion: s.engagements.rowVersion,
       })
       .from(s.engagements)
-      .innerJoin(s.clients, eq(s.engagements.clientId, s.clients.id)),
-    db.select().from(s.tasks),
-    db.select().from(s.procedures),
-    db.select().from(s.evidenceRequests),
-    db.select().from(s.comments).orderBy(desc(s.comments.createdAt)),
-    db.select().from(s.conversationThreads).orderBy(desc(s.conversationThreads.lastMessageAt)),
-    db.select().from(s.conversationParticipants),
-    db.select().from(s.conversationMessages).orderBy(s.conversationMessages.createdAt),
-    db.select().from(s.reviewNotes).orderBy(desc(s.reviewNotes.createdAt)),
+      .innerJoin(
+        s.clients,
+        and(
+          eq(s.engagements.clientId, s.clients.id),
+          eq(s.engagements.tenantId, s.clients.tenantId),
+        ),
+      )
+      .where(eq(s.engagements.tenantId, tenantId)),
+    db.select().from(s.tasks).where(eq(s.tasks.tenantId, tenantId)),
+    db.select().from(s.procedures).where(eq(s.procedures.tenantId, tenantId)),
+    db.select().from(s.evidenceRequests).where(eq(s.evidenceRequests.tenantId, tenantId)),
+    db.select().from(s.comments).where(eq(s.comments.tenantId, tenantId)).orderBy(desc(s.comments.createdAt)),
+    db.select().from(s.conversationThreads).where(eq(s.conversationThreads.tenantId, tenantId)).orderBy(desc(s.conversationThreads.lastMessageAt)),
+    db.select().from(s.conversationParticipants).where(eq(s.conversationParticipants.tenantId, tenantId)),
+    db.select().from(s.conversationMessages).where(eq(s.conversationMessages.tenantId, tenantId)).orderBy(s.conversationMessages.createdAt),
+    db.select().from(s.reviewNotes).where(eq(s.reviewNotes.tenantId, tenantId)).orderBy(desc(s.reviewNotes.createdAt)),
     db
       .select({
         id: s.documents.id,
+        publicId: s.documents.publicId,
         engagementId: s.documents.engagementId,
         requestId: s.documents.requestId,
         taskId: s.documents.taskId,
@@ -662,10 +394,12 @@ export async function getState(principal?: Principal) {
         createdAt: s.documents.createdAt,
       })
       .from(s.documents)
+      .where(eq(s.documents.tenantId, tenantId))
       .orderBy(desc(s.documents.createdAt)),
     db
       .select({
         id: s.permanentDocuments.id,
+        publicId: s.permanentDocuments.publicId,
         clientId: s.permanentDocuments.clientId,
         category: s.permanentDocuments.category,
         fileName: s.permanentDocuments.fileName,
@@ -677,40 +411,46 @@ export async function getState(principal?: Principal) {
         createdAt: s.permanentDocuments.createdAt,
       })
       .from(s.permanentDocuments)
+      .where(eq(s.permanentDocuments.tenantId, tenantId))
       .orderBy(desc(s.permanentDocuments.createdAt)),
     db
       .select()
       .from(s.auditEvents)
+      .where(eq(s.auditEvents.tenantId, tenantId))
       .orderBy(desc(s.auditEvents.createdAt))
       .limit(100),
-    db.select().from(s.users),
+    db.select().from(s.users).where(eq(s.users.tenantId, tenantId)),
     db
       .select()
       .from(s.workpaperVersions)
+      .where(eq(s.workpaperVersions.tenantId, tenantId))
       .orderBy(desc(s.workpaperVersions.createdAt)),
-    db.select().from(s.signoffs).orderBy(desc(s.signoffs.signedAt)),
-    db.select().from(s.trustees),
-    db.select().from(s.clientUsers),
-    db.select().from(s.concerns).orderBy(desc(s.concerns.createdAt)),
-    db.select().from(s.concernEvents).orderBy(desc(s.concernEvents.createdAt)),
+    db.select().from(s.signoffs).where(eq(s.signoffs.tenantId, tenantId)).orderBy(desc(s.signoffs.signedAt)),
+    db.select().from(s.trustees).where(eq(s.trustees.tenantId, tenantId)),
+    db.select().from(s.clientUsers).where(eq(s.clientUsers.tenantId, tenantId)),
+    db.select().from(s.concerns).where(eq(s.concerns.tenantId, tenantId)).orderBy(desc(s.concerns.createdAt)),
+    db.select().from(s.concernEvents).where(eq(s.concernEvents.tenantId, tenantId)).orderBy(desc(s.concernEvents.createdAt)),
     db
       .select()
       .from(s.fileLockEvents)
+      .where(eq(s.fileLockEvents.tenantId, tenantId))
       .orderBy(desc(s.fileLockEvents.createdAt)),
-    db.select().from(s.tbImports).orderBy(desc(s.tbImports.createdAt)),
-    db.select().from(s.tbAccounts),
-    db.select().from(s.tbAnalytics).orderBy(desc(s.tbAnalytics.createdAt)),
-    db.select().from(s.tbReconciliations),
+    db.select().from(s.tbImports).where(eq(s.tbImports.tenantId, tenantId)).orderBy(desc(s.tbImports.createdAt)),
+    db.select().from(s.tbAccounts).where(eq(s.tbAccounts.tenantId, tenantId)),
+    db.select().from(s.tbAnalytics).where(eq(s.tbAnalytics.tenantId, tenantId)).orderBy(desc(s.tbAnalytics.createdAt)),
+    db.select().from(s.tbReconciliations).where(eq(s.tbReconciliations.tenantId, tenantId)),
     db.select().from(s.jurisdictions).orderBy(s.jurisdictions.name),
     db
       .select()
       .from(s.jurisdictionRuleSets)
       .orderBy(desc(s.jurisdictionRuleSets.effectiveFrom)),
     db.select().from(s.organisationTypes).orderBy(s.organisationTypes.name),
-    db.select().from(s.practiceSettings).limit(1),
+    db.select().from(s.practiceSettings).where(eq(s.practiceSettings.tenantId, tenantId)).limit(1),
+    db.select({ name: s.tenants.name }).from(s.tenants).where(eq(s.tenants.id, tenantId)).limit(1),
   ]);
+  const practiceName = tenantRows[0]?.name ?? "Examination practice";
   const practiceSettings = practiceSettingsRows[0] ?? {
-    id: 1,
+    tenantId,
     concernReviewMode: "EXAMINER_JUDGEMENT",
     requireIndependentConcernClosure: false,
     allowProcedureSelfReview: false,
@@ -726,9 +466,37 @@ export async function getState(principal?: Principal) {
       ? { ...r, status: "OVERDUE" }
       : r,
   );
+  const catalog = {
+    clients,
+    engagements: engagementRows,
+    tasks,
+    procedures,
+    requests,
+    comments,
+    conversations,
+    conversationParticipants,
+    conversationMessages,
+    notes,
+    documents,
+    permanentDocuments,
+    audit: auditRows,
+    users,
+    versions,
+    signoffs,
+    trustees,
+    clientUsers,
+    concerns,
+    concernEvents,
+    lockEvents,
+    tbImports,
+    tbAccounts,
+    tbAnalytics,
+    tbReconciliations,
+  };
   if (currentActor.kind === "INTERNAL")
-    return {
+    return externaliseState({
       actor: currentActor,
+      practiceName,
       clients,
       engagements: engagementRows,
       tasks,
@@ -758,7 +526,7 @@ export async function getState(principal?: Principal) {
       jurisdictionRuleSets,
       organisationTypes,
       practiceSettings,
-    };
+    }, catalog);
   const allowedClients = new Set(currentActor.clientIds),
     visibleClients = clients.filter((row) => allowedClients.has(row.id)),
     visibleEngagements = engagementRows.filter((row) =>
@@ -794,6 +562,7 @@ export async function getState(principal?: Principal) {
     requestIds = new Set(visibleRequests.map((row) => row.id)),
     clientEngagements = visibleEngagements.map((row) => ({
       id: row.id,
+      publicId: row.publicId,
       clientId: row.clientId,
       clientName: row.clientName,
       charityNumber: row.charityNumber,
@@ -815,8 +584,9 @@ export async function getState(principal?: Principal) {
         ).length,
       };
     });
-  return {
+  return externaliseState({
     actor: currentActor,
+    practiceName,
     clients: visibleClients.map((row) => ({
       ...row,
       contactName: currentActor.name,
@@ -845,11 +615,8 @@ export async function getState(principal?: Principal) {
       (row) =>
         (row.requestId !== null && requestIds.has(row.requestId)) ||
         (row.conversationThreadId !== null &&
-          conversations.some(
-            (thread) =>
-              thread.id === row.conversationThreadId &&
-              engagementIds.has(thread.engagementId),
-          )),
+          row.conversationMessageId !== null &&
+          conversationIds.has(row.conversationThreadId)),
     ),
     permanentDocuments: [],
     audit: [],
@@ -869,7 +636,7 @@ export async function getState(principal?: Principal) {
     jurisdictionRuleSets: [],
     organisationTypes: [],
     practiceSettings: null,
-  };
+  }, catalog);
 }
 
 export async function snapshotHash(value: unknown) {

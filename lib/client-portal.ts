@@ -12,11 +12,11 @@ export function isRequestOverdue(
   return status === "OVERDUE" || (status !== "RECEIVED" && dueDate < today);
 }
 
-export function choosePortalEngagement(
-  engagementIds: number[],
-  preferredId: number | null | undefined,
-  requestedId: number | null | undefined,
-) {
+export function choosePortalEngagement<T extends string | number>(
+  engagementIds: T[],
+  preferredId: T | null | undefined,
+  requestedId: T | null | undefined,
+): T | null {
   if (preferredId && engagementIds.includes(preferredId)) return preferredId;
   if (requestedId && engagementIds.includes(requestedId)) return requestedId;
   return engagementIds[0] ?? null;

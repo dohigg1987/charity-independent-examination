@@ -21,6 +21,7 @@ import type {
   AppState,
   ConversationMessage,
   ConversationThread,
+  PublicId,
 } from "@/lib/types";
 
 type Mutate = (
@@ -36,14 +37,14 @@ export function CommunicationsWorkspace({
   notify,
 }: {
   state: AppState;
-  engagementId: number;
-  selectEngagement: (id: number) => void;
+  engagementId: PublicId;
+  selectEngagement: (id: PublicId) => void;
   mutate: Mutate;
   notify: (message: string) => void;
 }) {
   const [filter, setFilter] = useState<"ALL" | "UNREAD" | "OPEN" | "RESOLVED">("ALL");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<PublicId | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const threads = useMemo(
     () =>
@@ -102,7 +103,7 @@ export function CommunicationsWorkspace({
         <select
           value={engagementId}
           onChange={(event) => {
-            selectEngagement(Number(event.target.value));
+            selectEngagement(event.target.value);
             setSelectedId(null);
           }}
         >
@@ -250,7 +251,7 @@ function ConversationDetail({
     setBusy(true);
     setError("");
     try {
-      const attachmentIds: number[] = [];
+      const attachmentIds: PublicId[] = [];
       if (file) {
         const form = new FormData();
         form.set("file", file);
@@ -365,7 +366,7 @@ function ConversationDetail({
                   <footer>
                     <time>{dateTime(item.createdAt)}</time>
                     {mine && item.authorType !== "SYSTEM" && (
-                      <span><CheckCircle2 /> Delivered</span>
+                      <span><CheckCircle2 /> {messageReceipt(state, item)}</span>
                     )}
                     {item.authorType !== "SYSTEM" && (
                       <button onClick={() => setReplyTo(item)}><Reply /> Reply</button>
@@ -516,7 +517,7 @@ function NewConversation({
   notify,
 }: {
   state: AppState;
-  engagementId: number;
+  engagementId: PublicId;
   close: () => void;
   mutate: Mutate;
   notify: (message: string) => void;
@@ -541,7 +542,7 @@ function NewConversation({
             const values = Object.fromEntries(new FormData(event.currentTarget).entries());
             void mutate("createConversation", { ...values, engagementId })
               .then(() => {
-                notify("Conversation opened and delivered to the client portal");
+                notify("Conversation sent to the client portal");
                 close();
               })
               .catch((reason) => setError(reason instanceof Error ? reason.message : "Conversation could not be created"))
@@ -563,7 +564,7 @@ function NewConversation({
           </div>
           <label>Message<textarea name="message" required maxLength={10_000} placeholder="Set out the question, required action and relevant timing." /></label>
           <footer>
-            <span><ShieldCheck /> Delivered through the secure client portal</span>
+            <span><ShieldCheck /> Sent through the secure client portal</span>
             <button type="button" className="secondary" onClick={close}>Cancel</button>
             <button className="primary" disabled={busy}>{busy ? <Loader2 className="spin" /> : <Send />} Send</button>
           </footer>
@@ -591,11 +592,21 @@ function isUnread(state: AppState, thread: ConversationThread) {
   return Boolean(incoming && (!participant?.lastReadAt || incoming.createdAt > participant.lastReadAt));
 }
 
-function lastMessage(state: AppState, threadId: number) {
+function lastMessage(state: AppState, threadId: PublicId) {
   return state.conversationMessages.filter((item) => item.threadId === threadId).at(-1);
 }
 
-function counterparty(state: AppState, threadId: number) {
+function messageReceipt(state: AppState, message: ConversationMessage) {
+  const read = state.conversationParticipants.some(
+    (participant) =>
+      participant.threadId === message.threadId &&
+      participant.email.toLowerCase() !== message.authorEmail.toLowerCase() &&
+      Boolean(participant.lastReadAt && participant.lastReadAt >= message.createdAt),
+  );
+  return read ? "Read" : "Sent";
+}
+
+function counterparty(state: AppState, threadId: PublicId) {
   return state.conversationParticipants.find(
     (item) => item.threadId === threadId && item.participantType === "CLIENT",
   );

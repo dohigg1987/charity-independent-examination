@@ -49,24 +49,27 @@ test("the communication data model supports threads, participants, receipts and 
 });
 
 test("client and practitioner portals use the same server-backed conversation actions", async () => {
-  const [route, practitioner, client] = await Promise.all([
+  const [route, actions, practitioner, client] = await Promise.all([
     readFile("app/api/state/route.ts", "utf8"),
+    readFile("lib/state-actions/communications.ts", "utf8"),
     readFile("components/communications-workspace.tsx", "utf8"),
     readFile("components/client-messages.tsx", "utf8"),
   ]);
+  assert.match(route, /handleCommunicationAction/);
   for (const action of [
     "createConversation",
     "sendConversationMessage",
     "markConversationRead",
     "updateConversation",
   ]) {
-    assert.match(route, new RegExp(`action === "${action}"`));
+    assert.match(actions, new RegExp(`action === "${action}"`));
   }
   for (const surface of [practitioner, client]) {
     assert.match(surface, /sendConversationMessage/);
     assert.match(surface, /markConversationRead/);
     assert.match(surface, /conversationMessageId/);
-    assert.match(surface, /Delivered/);
+    assert.match(surface, /messageReceipt/);
+    assert.match(surface, /read \? "Read" : "Sent"/);
   }
 });
 

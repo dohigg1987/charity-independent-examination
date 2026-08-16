@@ -29,24 +29,27 @@ test("engagement selection preserves a valid active file and falls back safely",
 });
 
 test("portal response and receipt controls are implemented as request-scoped journeys", async () => {
-  const [portal, files, stateRoute] = await Promise.all([
+  const [portal, files, communications] = await Promise.all([
     readFile("components/client-portal.tsx", "utf8"),
     readFile("app/api/files/route.ts", "utf8"),
-    readFile("app/api/state/route.ts", "utf8"),
+    readFile("lib/state-actions/communications.ts", "utf8"),
   ]);
 
-  assert.match(portal, /Record<number, ResponseDraft>/);
+  assert.match(portal, /Record<PublicId, ResponseDraft>/);
   assert.match(portal, /form\.set\("message", draft\.note\.trim\(\)\)/);
   assert.match(portal, /Receipt \$\{receipt\.sha256\.slice/);
   assert.match(portal, /state\.actor\.name/);
+  assert.match(portal, /state\.practiceName/);
+  assert.doesNotMatch(portal, /D O(?:&apos;|')Higgins &amp; Co/);
   assert.match(portal, /examinerName/);
   assert.match(portal, /canRespond=\{canRespond\}/);
   assert.doesNotMatch(portal, /\/\s*13\)\s*\*/);
 
   assert.match(files, /body: responseNote \|\| `Uploaded evidence:/);
   assert.match(files, /responseIncluded: Boolean\(responseNote\)/);
-  assert.match(stateRoute, /\.set\(\{ status: "RECEIVED", receivedAt: now \}\)/);
-  assert.match(stateRoute, /status: statusAfterMessage\(who\.kind\)/);
+  assert.match(communications, /\.set\(\{ status: "RECEIVED", receivedAt: now \}\)/);
+  assert.match(communications, /status: statusAfterMessage\(who\.kind\)/);
+  assert.match(portal, /practiceName/);
 });
 
 test("mobile inbox navigation can return to a thread list", async () => {

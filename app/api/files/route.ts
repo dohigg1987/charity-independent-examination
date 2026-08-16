@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import * as s from "@/db/schema";
-import { actor, audit, seedIfEmpty } from "@/lib/server-data";
+import { actor, audit, prepareAuditInsert } from "@/lib/server-data";
 import {
   canAccessClient,
   canManagePractice,
@@ -19,6 +19,7 @@ import {
   verifyFile,
 } from "@/lib/security";
 import { errorResponse, json } from "@/lib/http";
+import { resolveOptionalPublicId, resolvePublicId } from "@/lib/public-ids";
 
 export const dynamic = "force-dynamic";
 function bucket() {
@@ -27,31 +28,35 @@ function bucket() {
   return value;
 }
 
+function randomInternalId(): number {
+  const words = crypto.getRandomValues(new Uint32Array(2));
+  return (words[0] & 0x1fffff) * 0x100000000 + words[1];
+}
+
+async function deleteObjectAfterFailedWrite(key: string) {
+  try {
+    await bucket().delete(key);
+  } catch {
+    // Preserve the database error. R2 lifecycle cleanup is the final safety net.
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    await seedIfEmpty();
     enforceSameOrigin(request);
     requireContentType(request, "multipart");
     const who = await actor();
-    await enforceRateLimit(`upload:${who.email}`, 20, 10 * 60_000);
+    await enforceRateLimit(who.tenantId, `upload:${who.email}`, 20, 10 * 60_000);
     const form = await request.formData();
     const file = form.get("file");
-    const clientId = form.get("clientId") ? Number(form.get("clientId")) : null;
+    const clientId = await resolveOptionalPublicId(who.tenantId, "client", form.get("clientId"), "clientId");
     const permanentCategory = String(form.get("permanentCategory") || "");
-    const requestId = form.get("requestId")
-      ? Number(form.get("requestId"))
-      : null;
-    const engagementId = Number(form.get("engagementId"));
-    let taskId = form.get("taskId") ? Number(form.get("taskId")) : null;
-    let procedureId = form.get("procedureId")
-      ? Number(form.get("procedureId"))
-      : null;
-    const concernId = form.get("concernId")
-      ? Number(form.get("concernId"))
-      : null;
-    let conversationThreadId = form.get("conversationThreadId")
-      ? Number(form.get("conversationThreadId"))
-      : null;
+    const requestId = await resolveOptionalPublicId(who.tenantId, "request", form.get("requestId"), "requestId");
+    const engagementId = await resolveOptionalPublicId(who.tenantId, "engagement", form.get("engagementId"), "engagementId");
+    let taskId = await resolveOptionalPublicId(who.tenantId, "task", form.get("taskId"), "taskId");
+    let procedureId = await resolveOptionalPublicId(who.tenantId, "procedure", form.get("procedureId"), "procedureId");
+    const concernId = await resolveOptionalPublicId(who.tenantId, "concern", form.get("concernId"), "concernId");
+    let conversationThreadId = await resolveOptionalPublicId(who.tenantId, "thread", form.get("conversationThreadId"), "conversationThreadId");
     const responseNote = String(form.get("message") || "").trim();
     const fileSection = String(form.get("fileSection") || "WORKPAPER");
     if (!(file instanceof File))
@@ -82,25 +87,32 @@ export async function POST(request: Request) {
         await getDb()
           .select()
           .from(s.clients)
-          .where(eq(s.clients.id, clientId))
+          .where(and(eq(s.clients.id, clientId), eq(s.clients.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       if (!client)
         return Response.json({ error: "Client not found" }, { status: 404 });
-      const key = `clients/${clientId}/permanent/${crypto.randomUUID()}-${safeDownloadName(file.name)}`;
+      const key = `tenants/${who.tenantId}/clients/${client.publicId}/permanent/${crypto.randomUUID()}-${safeDownloadName(file.name)}`;
       await bucket().put(key, bytes, {
         httpMetadata: { contentType: verified.mimeType },
         customMetadata: {
-          clientId: String(clientId),
+          tenantId: who.tenantId,
+          clientId: client.publicId,
           category: permanentCategory,
           uploadedBy: who.email,
           sha256: digest,
           validation: "signature-verified",
         },
       });
-      const [doc] = await getDb()
-        .insert(s.permanentDocuments)
-        .values({
+      const db = getDb();
+      const documentId = randomInternalId();
+      const documentPublicId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
+      try {
+        const permanentInsert = db.insert(s.permanentDocuments).values({
+          id: documentId,
+          publicId: documentPublicId,
+          tenantId: who.tenantId,
           clientId,
           category: permanentCategory,
           fileName: file.name,
@@ -109,23 +121,42 @@ export async function POST(request: Request) {
           storageKey: key,
           sha256: digest,
           uploadedBy: who.email,
-        })
-        .returning();
-      await audit(
-        null,
-        who.email,
-        "PERMANENT_FILE_UPLOADED",
-        "permanent_document",
-        String(doc.id),
-        {
-          clientId,
-          category: permanentCategory,
-          fileName: file.name,
-          sha256: digest,
-        },
-      );
+          createdAt,
+        });
+        const { statement: permanentAudit } = await prepareAuditInsert(
+          who.tenantId,
+          null,
+          who.email,
+          "PERMANENT_FILE_UPLOADED",
+          "permanent_document",
+          documentPublicId,
+          {
+            clientId,
+            category: permanentCategory,
+            fileName: file.name,
+            sha256: digest,
+          },
+        );
+        await db.batch([permanentInsert, permanentAudit]);
+      } catch (error) {
+        await deleteObjectAfterFailedWrite(key);
+        throw error;
+      }
       return json(
-        { document: { ...doc, storageKey: undefined } },
+        {
+          document: {
+            id: documentPublicId,
+            clientId: client.publicId,
+            category: permanentCategory,
+            fileName: file.name,
+            mimeType: verified.mimeType,
+            byteSize: file.size,
+            sha256: digest,
+            uploadedBy: who.email,
+            status: "CURRENT",
+            createdAt,
+          },
+        },
         { status: 201 },
       );
     }
@@ -153,7 +184,7 @@ export async function POST(request: Request) {
       await getDb()
         .select()
         .from(s.engagements)
-        .where(eq(s.engagements.id, engagementId))
+        .where(and(eq(s.engagements.id, engagementId), eq(s.engagements.tenantId, who.tenantId)))
         .limit(1)
     )[0];
     if (!engagement)
@@ -185,7 +216,7 @@ export async function POST(request: Request) {
         await getDb()
           .select()
           .from(s.evidenceRequests)
-          .where(eq(s.evidenceRequests.id, requestId))
+          .where(and(eq(s.evidenceRequests.id, requestId), eq(s.evidenceRequests.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       if (!evidence || evidence.engagementId !== engagementId)
@@ -209,7 +240,7 @@ export async function POST(request: Request) {
             await getDb()
               .select({ id: s.conversationThreads.id })
               .from(s.conversationThreads)
-              .where(eq(s.conversationThreads.requestId, requestId))
+              .where(and(eq(s.conversationThreads.requestId, requestId), eq(s.conversationThreads.tenantId, who.tenantId)))
               .limit(1)
           )[0]?.id ?? null;
     }
@@ -218,7 +249,7 @@ export async function POST(request: Request) {
         await getDb()
           .select()
           .from(s.conversationThreads)
-          .where(eq(s.conversationThreads.id, conversationThreadId))
+          .where(and(eq(s.conversationThreads.id, conversationThreadId), eq(s.conversationThreads.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       if (!thread || thread.engagementId !== engagementId)
@@ -236,6 +267,7 @@ export async function POST(request: Request) {
             .from(s.conversationParticipants)
             .where(
               and(
+                eq(s.conversationParticipants.tenantId, who.tenantId),
                 eq(s.conversationParticipants.threadId, thread.id),
                 eq(
                   s.conversationParticipants.email,
@@ -261,7 +293,7 @@ export async function POST(request: Request) {
         await getDb()
           .select()
           .from(s.procedures)
-          .where(eq(s.procedures.id, procedureId))
+          .where(and(eq(s.procedures.id, procedureId), eq(s.procedures.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       if (!procedure)
@@ -278,7 +310,7 @@ export async function POST(request: Request) {
         await getDb()
           .select()
           .from(s.concerns)
-          .where(eq(s.concerns.id, concernId))
+          .where(and(eq(s.concerns.id, concernId), eq(s.concerns.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       if (!concern || concern.engagementId !== engagementId)
@@ -292,7 +324,7 @@ export async function POST(request: Request) {
         await getDb()
           .select()
           .from(s.tasks)
-          .where(eq(s.tasks.id, taskId))
+          .where(and(eq(s.tasks.id, taskId), eq(s.tasks.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       if (!task || task.engagementId !== engagementId)
@@ -301,30 +333,42 @@ export async function POST(request: Request) {
           { status: 400 },
         );
     }
-    const key = `engagements/${engagementId}/${fileSection.toLowerCase()}/${crypto.randomUUID()}-${safeDownloadName(file.name)}`;
+    const key = `tenants/${who.tenantId}/engagements/${engagement.publicId}/${fileSection.toLowerCase()}/${crypto.randomUUID()}-${safeDownloadName(file.name)}`;
     await bucket().put(key, bytes, {
       httpMetadata: { contentType: verified.mimeType },
       customMetadata: {
-        engagementId: String(engagementId),
+        tenantId: who.tenantId,
+        engagementId: engagement.publicId,
         fileSection,
-        requestId: String(requestId),
-        procedureId: String(procedureId),
-        concernId: String(concernId),
-        conversationThreadId: String(conversationThreadId),
         uploadedBy: who.email,
         sha256: digest,
         validation: "signature-verified",
       },
     });
-    const [doc] = await getDb()
-      .insert(s.documents)
-      .values({
+    const db = getDb();
+    const documentId = randomInternalId();
+    const documentPublicId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const createsRequestReply = Boolean(requestId && conversationThreadId);
+    const conversationMessageId = createsRequestReply
+      ? randomInternalId()
+      : null;
+    const conversationMessagePublicId = createsRequestReply
+      ? crypto.randomUUID()
+      : null;
+    try {
+      const statements = [];
+      const documentInsert = db.insert(s.documents).values({
+        id: documentId,
+        publicId: documentPublicId,
+        tenantId: who.tenantId,
         engagementId,
         requestId,
         taskId,
         procedureId,
         concernId,
         conversationThreadId,
+        conversationMessageId,
         fileSection,
         fileName: file.name,
         mimeType: verified.mimeType,
@@ -333,60 +377,98 @@ export async function POST(request: Request) {
         sha256: digest,
         uploadedBy: who.email,
         malwareStatus: "SIGNATURE_VERIFIED",
-      })
-      .returning();
-    if (requestId && conversationThreadId) {
-      const now = new Date().toISOString();
-      const [message] = await getDb()
-        .insert(s.conversationMessages)
-        .values({
+        createdAt,
+      });
+      if (
+        requestId &&
+        conversationThreadId &&
+        conversationMessageId &&
+        conversationMessagePublicId
+      ) {
+        statements.push(db.insert(s.conversationMessages).values({
+          id: conversationMessageId,
+          publicId: conversationMessagePublicId,
+          tenantId: who.tenantId,
           threadId: conversationThreadId,
           authorEmail: who.email,
           authorName: who.name,
           authorType: who.kind === "CLIENT" ? "CLIENT" : "PRACTICE",
           body: responseNote || `Uploaded evidence: ${file.name}`,
-          createdAt: now,
-        })
-        .returning();
-      await getDb()
-        .update(s.documents)
-        .set({ conversationMessageId: message.id })
-        .where(eq(s.documents.id, doc.id));
-      await getDb()
-        .update(s.conversationThreads)
-        .set({
-          status:
-            who.kind === "CLIENT" ? "WAITING_PRACTICE" : "WAITING_CLIENT",
-          lastMessageAt: now,
-          updatedAt: now,
-        })
-        .where(eq(s.conversationThreads.id, conversationThreadId));
+          createdAt,
+        }));
+        statements.push(documentInsert);
+        statements.push(db
+          .update(s.conversationThreads)
+          .set({
+            status:
+              who.kind === "CLIENT" ? "WAITING_PRACTICE" : "WAITING_CLIENT",
+            lastMessageAt: createdAt,
+            updatedAt: createdAt,
+          })
+          .where(
+            and(
+              eq(s.conversationThreads.id, conversationThreadId),
+              eq(s.conversationThreads.tenantId, who.tenantId),
+            ),
+          ));
+      } else statements.push(documentInsert);
+      if (requestId)
+        statements.push(db
+          .update(s.evidenceRequests)
+          .set({ status: "RECEIVED", receivedAt: createdAt })
+          .where(
+            and(
+              eq(s.evidenceRequests.id, requestId),
+              eq(s.evidenceRequests.tenantId, who.tenantId),
+            ),
+          ));
+      const { statement: documentAudit } = await prepareAuditInsert(
+        who.tenantId,
+        engagementId,
+        who.email,
+        "DOCUMENT_UPLOADED",
+        "document",
+        documentPublicId,
+        {
+          fileName: file.name,
+          fileSection,
+          sha256: digest,
+          requestId,
+          taskId,
+          procedureId,
+          concernId,
+          conversationThreadId,
+          conversationMessageId: conversationMessagePublicId,
+          responseIncluded: Boolean(responseNote),
+          staged: Boolean(conversationThreadId && !conversationMessageId),
+        },
+      );
+      statements.push(documentAudit);
+      await db.batch(
+        statements as [
+          typeof statements[number],
+          ...typeof statements[number][],
+        ],
+      );
+    } catch (error) {
+      await deleteObjectAfterFailedWrite(key);
+      throw error;
     }
-    if (requestId)
-      await getDb()
-        .update(s.evidenceRequests)
-        .set({ status: "RECEIVED", receivedAt: new Date().toISOString() })
-        .where(eq(s.evidenceRequests.id, requestId));
-    await audit(
-      engagementId,
-      who.email,
-      "DOCUMENT_UPLOADED",
-      "document",
-      String(doc.id),
-      {
-        fileName: file.name,
-        fileSection,
-        sha256: digest,
-        requestId,
-        taskId,
-        procedureId,
-        concernId,
-        conversationThreadId,
-        responseIncluded: Boolean(responseNote),
-      },
-    );
     return json(
-      { document: { ...doc, storageKey: undefined } },
+      {
+        document: {
+          id: documentPublicId,
+          engagementId: engagement.publicId,
+          fileSection,
+          fileName: file.name,
+          mimeType: verified.mimeType,
+          byteSize: file.size,
+          sha256: digest,
+          uploadedBy: who.email,
+          malwareStatus: "SIGNATURE_VERIFIED",
+          createdAt,
+        },
+      },
       { status: 201 },
     );
   } catch (error) {
@@ -398,27 +480,34 @@ export async function GET(request: Request) {
   try {
     const who = await actor();
     const params = new URL(request.url).searchParams;
-    const permanentId = Number(params.get("permanentId"));
-    const id = Number(params.get("id"));
+    const permanentValue = params.get("permanentId");
+    const documentValue = params.get("id");
+    if (!permanentValue && !documentValue) return new Response("Not found", { status: 404 });
+    const permanentId = permanentValue
+      ? await resolvePublicId(who.tenantId, "permanentDocument", permanentValue, "permanentId")
+      : null;
+    const documentId = documentValue
+      ? await resolvePublicId(who.tenantId, "document", documentValue, "id")
+      : null;
     const doc = permanentId
       ? (
           await getDb()
             .select()
             .from(s.permanentDocuments)
-            .where(eq(s.permanentDocuments.id, permanentId))
+            .where(and(eq(s.permanentDocuments.id, permanentId), eq(s.permanentDocuments.tenantId, who.tenantId)))
             .limit(1)
         )[0]
       : (
           await getDb()
             .select()
             .from(s.documents)
-            .where(eq(s.documents.id, id))
+            .where(and(eq(s.documents.id, documentId!), eq(s.documents.tenantId, who.tenantId)))
             .limit(1)
         )[0];
     if (!doc) return new Response("Not found", { status: 404 });
     if ("clientId" in doc)
       requirePermission(
-        canAccessClient(who, doc.clientId),
+        canAccessClient(who, doc.clientId, doc.tenantId),
         "This permanent-file document is not available to the signed-in account",
       );
     else {
@@ -426,11 +515,12 @@ export async function GET(request: Request) {
         await getDb()
           .select()
           .from(s.engagements)
-          .where(eq(s.engagements.id, doc.engagementId))
+          .where(and(eq(s.engagements.id, doc.engagementId), eq(s.engagements.tenantId, who.tenantId)))
           .limit(1)
       )[0];
       requirePermission(
-        Boolean(engagement) && canAccessClient(who, engagement.clientId),
+        Boolean(engagement) &&
+          canAccessClient(who, engagement.clientId, engagement.tenantId),
         "This document is not available to the signed-in account",
       );
       if (who.kind === "CLIENT") {
@@ -438,13 +528,19 @@ export async function GET(request: Request) {
           doc.requestId !== null || doc.conversationThreadId !== null,
           "Client accounts cannot access internal workpapers",
         );
+        requirePermission(
+          doc.conversationThreadId === null ||
+            doc.requestId !== null ||
+            doc.conversationMessageId !== null,
+          "This attachment has not been sent",
+        );
         if (who.clientRoles[engagement.clientId] !== "PORTAL_ADMIN") {
           const assignedRequest = doc.requestId
             ? (
                 await getDb()
                   .select({ contactEmail: s.evidenceRequests.contactEmail })
                   .from(s.evidenceRequests)
-                  .where(eq(s.evidenceRequests.id, doc.requestId))
+                  .where(and(eq(s.evidenceRequests.id, doc.requestId), eq(s.evidenceRequests.tenantId, who.tenantId)))
                   .limit(1)
               )[0]
             : null;
@@ -455,6 +551,10 @@ export async function GET(request: Request) {
                   .from(s.conversationParticipants)
                   .where(
                     and(
+                      eq(
+                        s.conversationParticipants.tenantId,
+                        who.tenantId,
+                      ),
                       eq(
                         s.conversationParticipants.threadId,
                         doc.conversationThreadId,
@@ -483,7 +583,7 @@ export async function GET(request: Request) {
       who.email,
       "DOCUMENT_DOWNLOADED",
       permanentId ? "permanent_document" : "document",
-      String(permanentId || id),
+      doc.publicId,
       {},
     );
     return new Response(object.body, {

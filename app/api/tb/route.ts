@@ -1,12 +1,11 @@
 import { env } from "cloudflare:workers";
-import { desc, eq, max } from "drizzle-orm";
+import { and, desc, eq, max, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import * as s from "@/db/schema";
 import {
   actor,
-  audit,
   getState,
-  seedIfEmpty,
+  prepareAuditInsert,
   snapshotHash,
 } from "@/lib/server-data";
 import {
@@ -24,6 +23,7 @@ import {
 } from "@/lib/security";
 import { errorResponse, json } from "@/lib/http";
 import { validatePayload } from "@/lib/validation";
+import { resolvePublicBodyIds, resolvePublicId } from "@/lib/public-ids";
 
 export const dynamic = "force-dynamic";
 const template =
@@ -34,17 +34,22 @@ function bucket() {
   if (!value) throw new Error("Document storage is unavailable");
   return value;
 }
-async function nextConcernReference(engagementId: number) {
-  const rows = await getDb()
-    .select({ reference: s.concerns.reference })
-    .from(s.concerns)
-    .where(eq(s.concerns.engagementId, engagementId));
-  const next =
-    Math.max(
-      0,
-      ...rows.map((row) => Number(row.reference.match(/(\d+)$/)?.[1] ?? 0)),
-    ) + 1;
-  return `FND-${engagementId}-${String(next).padStart(3, "0")}`;
+async function nextConcernReference(engagementId: number, tenantId: string) {
+  const db = getDb();
+  const engagement = (
+    await db
+      .select({ publicId: s.engagements.publicId })
+      .from(s.engagements)
+      .where(
+        and(
+          eq(s.engagements.id, engagementId),
+          eq(s.engagements.tenantId, tenantId),
+        ),
+      )
+      .limit(1)
+  )[0];
+  if (!engagement) throw new Error("Engagement not found");
+  return `FND-${engagement.publicId.slice(0, 8).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
 }
 function normalise(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -126,11 +131,12 @@ function autoMap(name: string, fund: string) {
 }
 
 async function requireOpen(engagementId: number) {
+  const who = await actor();
   const row = (
     await getDb()
       .select()
       .from(s.engagements)
-      .where(eq(s.engagements.id, engagementId))
+      .where(and(eq(s.engagements.id, engagementId), eq(s.engagements.tenantId, who.tenantId)))
       .limit(1)
   )[0];
   if (!row) throw new Error("Engagement not found");
@@ -141,11 +147,12 @@ async function requireOpen(engagementId: number) {
   return row;
 }
 async function importFor(id: number) {
+  const who = await actor();
   const row = (
     await getDb()
       .select()
       .from(s.tbImports)
-      .where(eq(s.tbImports.id, id))
+      .where(and(eq(s.tbImports.id, id), eq(s.tbImports.tenantId, who.tenantId)))
       .limit(1)
   )[0];
   if (!row) throw new Error("Trial balance version not found");
@@ -178,14 +185,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await seedIfEmpty();
     enforceSameOrigin(request);
     const who = await actor();
     requirePermission(
       canPrepare(who),
       "Engagement team permission is required",
     );
-    await enforceRateLimit(`tb:${who.email}`, 60, 60_000);
+    await enforceRateLimit(who.tenantId, `tb:${who.email}`, 60, 60_000);
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
       requireContentType(request, "multipart");
@@ -193,16 +199,17 @@ export async function POST(request: Request) {
     }
     requireContentType(request, "json");
     const db = getDb(),
-      body = (await request.json()) as Record<string, unknown>,
-      action = String(body.action || "");
-    validatePayload(body);
+      input = (await request.json()) as Record<string, unknown>,
+      action = String(input.action || "");
+    validatePayload(input);
+    const body = await resolvePublicBodyIds(who.tenantId, input);
     if (action === "updateTbAccount") {
       const id = Number(body.accountId),
         account = (
           await db
             .select()
             .from(s.tbAccounts)
-            .where(eq(s.tbAccounts.id, id))
+            .where(and(eq(s.tbAccounts.id, id), eq(s.tbAccounts.tenantId, who.tenantId)))
             .limit(1)
         )[0];
       if (!account)
@@ -214,7 +221,7 @@ export async function POST(request: Request) {
         statementLine = String(body.statementLine || account.statementLine),
         fund = String(body.fund || account.fund),
         noteReference = String(body.noteReference ?? account.noteReference);
-      await db
+      const accountUpdate = db
         .update(s.tbAccounts)
         .set({
           statementLine,
@@ -222,15 +229,35 @@ export async function POST(request: Request) {
           noteReference,
           mappingStatus: statementLine === "UNMAPPED" ? "UNMAPPED" : "MANUAL",
         })
-        .where(eq(s.tbAccounts.id, id));
-      await rebuildReconciliations(imported.engagementId, imported.id);
-      await audit(
-        imported.engagementId,
-        who.email,
-        "TB_ACCOUNT_MAPPED",
-        "tb_account",
-        String(id),
-        { statementLine, fund, noteReference },
+        .where(
+          and(
+            eq(s.tbAccounts.id, id),
+            eq(s.tbAccounts.tenantId, who.tenantId),
+          ),
+        );
+      const reconciliationStatements = await prepareReconciliationStatements(
+          imported.engagementId,
+          imported.id,
+          who.tenantId,
+          { accountId: id, statementLine },
+        ),
+        auditInsert = (
+          await prepareAuditInsert(
+            who.tenantId,
+            imported.engagementId,
+            who.email,
+            "TB_ACCOUNT_MAPPED",
+            "tb_account",
+            String(id),
+            { statementLine, fund, noteReference },
+          )
+        ).statement,
+        statements = [accountUpdate, ...reconciliationStatements, auditInsert];
+      await db.batch(
+        statements as [
+          (typeof statements)[number],
+          ...(typeof statements)[number][],
+        ],
       );
     } else if (action === "updateTbReconciliation") {
       const id = Number(body.reconciliationId),
@@ -238,7 +265,7 @@ export async function POST(request: Request) {
           await db
             .select()
             .from(s.tbReconciliations)
-            .where(eq(s.tbReconciliations.id, id))
+            .where(and(eq(s.tbReconciliations.id, id), eq(s.tbReconciliations.tenantId, who.tenantId)))
             .limit(1)
         )[0];
       if (!row)
@@ -255,7 +282,7 @@ export async function POST(request: Request) {
           : explanation
             ? "EXPLAINED"
             : "NOT_RECONCILED";
-      await db
+      const reconciliationUpdate = db
         .update(s.tbReconciliations)
         .set({
           accountsAmount,
@@ -265,22 +292,31 @@ export async function POST(request: Request) {
           preparedBy: who.name,
           preparedAt: new Date().toISOString(),
         })
-        .where(eq(s.tbReconciliations.id, id));
-      await audit(
-        row.engagementId,
-        who.email,
-        "TB_RECONCILIATION_UPDATED",
-        "tb_reconciliation",
-        String(id),
-        { status, difference },
-      );
+        .where(
+          and(
+            eq(s.tbReconciliations.id, id),
+            eq(s.tbReconciliations.tenantId, who.tenantId),
+          ),
+        ),
+        auditInsert = (
+          await prepareAuditInsert(
+            who.tenantId,
+            row.engagementId,
+            who.email,
+            "TB_RECONCILIATION_UPDATED",
+            "tb_reconciliation",
+            String(id),
+            { status, difference },
+          )
+        ).statement;
+      await db.batch([reconciliationUpdate, auditInsert]);
     } else if (action === "saveAnalytic") {
       const id = Number(body.analyticId),
         row = (
           await db
             .select()
             .from(s.tbAnalytics)
-            .where(eq(s.tbAnalytics.id, id))
+            .where(and(eq(s.tbAnalytics.id, id), eq(s.tbAnalytics.tenantId, who.tenantId)))
             .limit(1)
         )[0];
       if (!row)
@@ -294,6 +330,11 @@ export async function POST(request: Request) {
         conclusion = String(body.conclusion || "").trim(),
         status = String(body.status || "OPEN"),
         now = new Date().toISOString();
+      if (!["PREPARED", "REVIEWED"].includes(status))
+        return Response.json(
+          { error: "Select a valid analytical sign-off status" },
+          { status: 400 },
+        );
       if (
         (status === "PREPARED" || status === "REVIEWED") &&
         (!explanation || !targetedWork || !conclusion)
@@ -325,7 +366,7 @@ export async function POST(request: Request) {
         conclusion,
         status,
       });
-      await db
+      const analyticUpdate = db
         .update(s.tbAnalytics)
         .set({
           explanation,
@@ -337,9 +378,19 @@ export async function POST(request: Request) {
           reviewedBy: status === "REVIEWED" ? who.email : row.reviewedBy,
           reviewedAt: status === "REVIEWED" ? now : row.reviewedAt,
         })
-        .where(eq(s.tbAnalytics.id, id));
-      if (status === "PREPARED" || status === "REVIEWED")
-        await db.insert(s.signoffs).values({
+        .where(and(eq(s.tbAnalytics.id, id), eq(s.tbAnalytics.tenantId, who.tenantId)));
+      const { statement: auditInsert } = await prepareAuditInsert(
+        who.tenantId,
+        row.engagementId,
+        who.email,
+        "TB_ANALYTIC_SAVED",
+        "tb_analytic",
+        String(id),
+        { status, hash },
+      );
+      if (status === "PREPARED" || status === "REVIEWED") {
+        const signoffInsert = db.insert(s.signoffs).values({
+          tenantId: who.tenantId,
           engagementId: row.engagementId,
           taskId: row.linkedTaskId,
           procedureId: row.linkedProcedureId,
@@ -348,21 +399,15 @@ export async function POST(request: Request) {
           snapshotHash: hash,
           signedBy: who.email,
         });
-      await audit(
-        row.engagementId,
-        who.email,
-        "TB_ANALYTIC_SAVED",
-        "tb_analytic",
-        String(id),
-        { status, hash },
-      );
+        await db.batch([analyticUpdate, signoffInsert, auditInsert]);
+      } else await db.batch([analyticUpdate, auditInsert]);
     } else if (action === "escalateAnalytic") {
       const id = Number(body.analyticId),
         row = (
           await db
             .select()
             .from(s.tbAnalytics)
-            .where(eq(s.tbAnalytics.id, id))
+            .where(and(eq(s.tbAnalytics.id, id), eq(s.tbAnalytics.tenantId, who.tenantId)))
             .limit(1)
         )[0];
       if (!row)
@@ -372,45 +417,71 @@ export async function POST(request: Request) {
         );
       await importFor(row.tbImportId);
       if (!row.concernId) {
-        const [concern] = await db
-          .insert(s.concerns)
-          .values({
+        const concernPublicId = crypto.randomUUID(),
+          reference = await nextConcernReference(
+            row.engagementId,
+            who.tenantId,
+          ),
+          description = `${row.expectation}. Actual ${row.actual}; comparator ${row.comparator}; variance ${row.variance}.`,
+          concernId = sql<number>`(
+            SELECT ${s.concerns.id}
+            FROM ${s.concerns}
+            WHERE ${s.concerns.tenantId} = ${who.tenantId}
+              AND ${s.concerns.publicId} = ${concernPublicId}
+          )`,
+          concernInsert = db.insert(s.concerns).values({
+            tenantId: who.tenantId,
+            publicId: concernPublicId,
             engagementId: row.engagementId,
             taskId: row.linkedTaskId,
             procedureId: row.linkedProcedureId,
-            reference: await nextConcernReference(row.engagementId),
+            reference,
             sourceType: "TB_ANALYTIC",
             title: `TB analytical exception: ${row.title}`,
-            description: `${row.expectation}. Actual ${row.actual}; comparator ${row.comparator}; variance ${row.variance}.`,
+            description,
             severity: row.severity,
             targetedResponse:
               row.targetedWork ||
               "Obtain an explanation and perform proportionate targeted verification.",
             owner: who.name,
             createdBy: who.email,
-          })
-          .returning();
-        await db.insert(s.concernEvents).values({
-          concernId: concern.id,
-          engagementId: row.engagementId,
-          eventType: "CREATED",
-          body: concern.description,
-          metadata: JSON.stringify({ analyticId: row.id }),
-          actorEmail: who.email,
-          actorName: who.name,
-        });
-        await db
-          .update(s.tbAnalytics)
-          .set({ concernId: concern.id, status: "ESCALATED" })
-          .where(eq(s.tbAnalytics.id, id));
-        await audit(
-          row.engagementId,
-          who.email,
-          "TB_ANALYTIC_ESCALATED",
-          "tb_analytic",
-          String(id),
-          { concernId: concern.id },
-        );
+          }),
+          eventInsert = db.insert(s.concernEvents).values({
+            tenantId: who.tenantId,
+            concernId,
+            engagementId: row.engagementId,
+            eventType: "CREATED",
+            body: description,
+            metadata: JSON.stringify({ analyticId: row.id }),
+            actorEmail: who.email,
+            actorName: who.name,
+          }),
+          analyticUpdate = db
+            .update(s.tbAnalytics)
+            .set({ concernId, status: "ESCALATED" })
+            .where(
+              and(
+                eq(s.tbAnalytics.id, id),
+                eq(s.tbAnalytics.tenantId, who.tenantId),
+              ),
+            ),
+          auditInsert = (
+            await prepareAuditInsert(
+              who.tenantId,
+              row.engagementId,
+              who.email,
+              "TB_ANALYTIC_ESCALATED",
+              "tb_analytic",
+              String(id),
+              { concernPublicId, reference },
+            )
+          ).statement;
+        await db.batch([
+          concernInsert,
+          eventInsert,
+          analyticUpdate,
+          auditInsert,
+        ]);
       }
     } else if (action === "requestAnalyticEvidence") {
       const id = Number(body.analyticId),
@@ -418,7 +489,7 @@ export async function POST(request: Request) {
           await db
             .select()
             .from(s.tbAnalytics)
-            .where(eq(s.tbAnalytics.id, id))
+            .where(and(eq(s.tbAnalytics.id, id), eq(s.tbAnalytics.tenantId, who.tenantId)))
             .limit(1)
         )[0];
       if (!row)
@@ -431,57 +502,67 @@ export async function POST(request: Request) {
           await db
             .select()
             .from(s.engagements)
-            .where(eq(s.engagements.id, imported.engagementId))
+            .where(and(eq(s.engagements.id, imported.engagementId), eq(s.engagements.tenantId, who.tenantId)))
             .limit(1)
         )[0],
         client = (
           await db
             .select()
             .from(s.clients)
-            .where(eq(s.clients.id, engagement.clientId))
+            .where(and(eq(s.clients.id, engagement.clientId), eq(s.clients.tenantId, who.tenantId)))
             .limit(1)
         )[0],
-        reference = `REQ-${String(Date.now()).slice(-5)}`;
-      await db.insert(s.evidenceRequests).values({
-        engagementId: row.engagementId,
-        taskId: row.linkedTaskId,
-        procedureId: row.linkedProcedureId,
-        reference,
-        title: `TB analysis: ${row.title}`,
-        description: `Please explain the identified variance and provide supporting evidence. ${row.expectation}`,
-        contactName: client.contactName,
-        contactEmail: client.contactEmail,
-        dueDate: String(
-          body.dueDate ||
-            new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-        ),
-      });
-      await audit(
-        row.engagementId,
-        who.email,
-        "TB_ANALYTIC_REQUEST_SENT",
-        "tb_analytic",
-        String(id),
-        { reference },
-      );
+        reference = `REQ-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+        requestInsert = db.insert(s.evidenceRequests).values({
+          tenantId: who.tenantId,
+          engagementId: row.engagementId,
+          taskId: row.linkedTaskId,
+          procedureId: row.linkedProcedureId,
+          reference,
+          title: `TB analysis: ${row.title}`,
+          description: `Please explain the identified variance and provide supporting evidence. ${row.expectation}`,
+          contactName: client.contactName,
+          contactEmail: client.contactEmail,
+          dueDate: String(
+            body.dueDate ||
+              new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+          ),
+        }),
+        auditInsert = (
+          await prepareAuditInsert(
+            who.tenantId,
+            row.engagementId,
+            who.email,
+            "TB_ANALYTIC_REQUEST_SENT",
+            "tb_analytic",
+            String(id),
+            { reference },
+          )
+        ).statement;
+      await db.batch([requestInsert, auditInsert]);
     } else if (action === "signoffTb") {
       const id = Number(body.tbImportId),
         row = await importFor(id),
         accounts = await db
           .select()
           .from(s.tbAccounts)
-          .where(eq(s.tbAccounts.tbImportId, id)),
+          .where(and(eq(s.tbAccounts.tbImportId, id), eq(s.tbAccounts.tenantId, who.tenantId))),
         analytics = await db
           .select()
           .from(s.tbAnalytics)
-          .where(eq(s.tbAnalytics.tbImportId, id)),
+          .where(and(eq(s.tbAnalytics.tbImportId, id), eq(s.tbAnalytics.tenantId, who.tenantId))),
         reconciliations = await db
           .select()
           .from(s.tbReconciliations)
-          .where(eq(s.tbReconciliations.tbImportId, id)),
+          .where(and(eq(s.tbReconciliations.tbImportId, id), eq(s.tbReconciliations.tenantId, who.tenantId))),
         status = String(body.status || "PREPARED"),
         conclusion = String(body.conclusion || "").trim(),
         now = new Date().toISOString();
+      if (!["PREPARED", "REVIEWED"].includes(status))
+        return Response.json(
+          { error: "Select a valid trial balance sign-off status" },
+          { status: 400 },
+        );
       if (!conclusion)
         return Response.json(
           { error: "Record the overall analytical review conclusion" },
@@ -522,7 +603,7 @@ export async function POST(request: Request) {
         conclusion,
         status,
       });
-      await db
+      const importUpdate = db
         .update(s.tbImports)
         .set({
           analysisConclusion: conclusion,
@@ -532,22 +613,27 @@ export async function POST(request: Request) {
           reviewedBy: status === "REVIEWED" ? who.email : row.reviewedBy,
           reviewedAt: status === "REVIEWED" ? now : row.reviewedAt,
         })
-        .where(eq(s.tbImports.id, id));
-      await db.insert(s.signoffs).values({
-        engagementId: row.engagementId,
-        type: `TB_ANALYSIS_${status}`,
-        statement: `Trial balance version ${row.version} analysis ${status.toLowerCase()}`,
-        snapshotHash: hash,
-        signedBy: who.email,
-      });
-      await audit(
-        row.engagementId,
-        who.email,
-        "TB_ANALYSIS_SIGNED_OFF",
-        "tb_import",
-        String(id),
-        { status, hash },
-      );
+        .where(and(eq(s.tbImports.id, id), eq(s.tbImports.tenantId, who.tenantId))),
+        signoffInsert = db.insert(s.signoffs).values({
+          tenantId: who.tenantId,
+          engagementId: row.engagementId,
+          type: `TB_ANALYSIS_${status}`,
+          statement: `Trial balance version ${row.version} analysis ${status.toLowerCase()}`,
+          snapshotHash: hash,
+          signedBy: who.email,
+        }),
+        auditInsert = (
+          await prepareAuditInsert(
+            who.tenantId,
+            row.engagementId,
+            who.email,
+            "TB_ANALYSIS_SIGNED_OFF",
+            "tb_import",
+            String(id),
+            { status, hash },
+          )
+        ).statement;
+      await db.batch([importUpdate, signoffInsert, auditInsert]);
     } else
       return Response.json({ error: "Unknown TB action" }, { status: 400 });
     return json(await getState(who));
@@ -561,7 +647,7 @@ async function importTrialBalance(request: Request) {
     who = await actor(),
     form = await request.formData(),
     file = form.get("file"),
-    engagementId = Number(form.get("engagementId"));
+    engagementId = await resolvePublicId(who.tenantId, "engagement", form.get("engagementId"), "engagementId");
   if (!(file instanceof File) || !engagementId)
     return Response.json(
       { error: "A CSV trial balance and engagement are required" },
@@ -688,20 +774,34 @@ async function importTrialBalance(request: Request) {
     )
       .map((b) => b.toString(16).padStart(2, "0"))
       .join(""),
-    key = `engagements/${engagementId}/trial_balance/${crypto.randomUUID()}-${safeDownloadName(file.name)}`;
+    key = `tenants/${who.tenantId}/engagements/${engagement.publicId}/trial_balance/${crypto.randomUUID()}-${safeDownloadName(file.name)}`,
+    documentPublicId = crypto.randomUUID(),
+    importPublicId = crypto.randomUUID(),
+    [{ v }] = await db
+      .select({ v: max(s.tbImports.version) })
+      .from(s.tbImports)
+      .where(
+        and(
+          eq(s.tbImports.engagementId, engagementId),
+          eq(s.tbImports.tenantId, who.tenantId),
+        ),
+      ),
+    version = (v ?? 0) + 1;
   await bucket().put(key, bytes, {
     httpMetadata: { contentType: "text/csv" },
     customMetadata: {
-      engagementId: String(engagementId),
+      tenantId: who.tenantId,
+      engagementPublicId: engagement.publicId,
       fileSection: "TRIAL_BALANCE",
       uploadedBy: who.email,
       sha256: digest,
       validation: "signature-verified",
     },
   });
-  const [doc] = await db
-      .insert(s.documents)
-      .values({
+  try {
+    const documentInsert = db.insert(s.documents).values({
+        tenantId: who.tenantId,
+        publicId: documentPublicId,
         engagementId,
         fileSection: "TRIAL_BALANCE",
         fileName: file.name,
@@ -711,21 +811,28 @@ async function importTrialBalance(request: Request) {
         sha256: digest,
         uploadedBy: who.email,
         malwareStatus: "SIGNATURE_VERIFIED",
-      })
-      .returning(),
-    [{ v }] = await db
-      .select({ v: max(s.tbImports.version) })
-      .from(s.tbImports)
-      .where(eq(s.tbImports.engagementId, engagementId)),
-    [imported] = await db
-      .insert(s.tbImports)
-      .values({
+      }),
+      documentId = sql<number>`(
+        SELECT ${s.documents.id}
+        FROM ${s.documents}
+        WHERE ${s.documents.tenantId} = ${who.tenantId}
+          AND ${s.documents.publicId} = ${documentPublicId}
+      )`,
+      tbImportId = sql<number>`(
+        SELECT ${s.tbImports.id}
+        FROM ${s.tbImports}
+        WHERE ${s.tbImports.tenantId} = ${who.tenantId}
+          AND ${s.tbImports.publicId} = ${importPublicId}
+      )`,
+      importInsert = db.insert(s.tbImports).values({
+        tenantId: who.tenantId,
+        publicId: importPublicId,
         engagementId,
-        documentId: doc.id,
-        version: (v ?? 0) + 1,
+        documentId,
+        version,
         fileName: file.name,
         sourceFormat: "CSV",
-        status: issues.length ? "VALIDATION_REQUIRED" : "IMPORTED",
+        status: "PROCESSING",
         rowCount: parsed.length,
         debitTotal,
         creditTotal,
@@ -733,28 +840,147 @@ async function importTrialBalance(request: Request) {
         isBalanced,
         validationIssues: JSON.stringify(issues),
         uploadedBy: who.email,
-      })
-      .returning();
-  await db
-    .insert(s.tbAccounts)
-    .values(parsed.map((row) => ({ ...row, tbImportId: imported.id })));
-  await generateAnalytics(engagement, imported.id);
-  await rebuildReconciliations(engagementId, imported.id);
-  await audit(
-    engagementId,
-    who.email,
-    "TRIAL_BALANCE_IMPORTED",
-    "tb_import",
-    String(imported.id),
-    {
-      version: imported.version,
-      rowCount: parsed.length,
-      isBalanced,
-      issues: issues.length,
-      sha256: digest,
-    },
-  );
-  return json(await getState(who), { status: 201 });
+      }),
+      accountInsert = db.insert(s.tbAccounts).values(
+        parsed.map((row) => ({
+          ...row,
+          tenantId: who.tenantId,
+          tbImportId,
+        })),
+      );
+    await db.batch([documentInsert, importInsert, accountInsert]);
+
+    const imported = (
+      await db
+        .select()
+        .from(s.tbImports)
+        .where(
+          and(
+            eq(s.tbImports.publicId, importPublicId),
+            eq(s.tbImports.tenantId, who.tenantId),
+          ),
+        )
+        .limit(1)
+    )[0];
+    if (!imported) throw new Error("Trial balance import could not be staged");
+
+    const analytics = await buildAnalytics(engagement, imported.id),
+      reconciliations = buildInitialReconciliations(
+        parsed,
+        engagementId,
+        imported.id,
+        who.tenantId,
+      ),
+      finalStatus = issues.length ? "VALIDATION_REQUIRED" : "IMPORTED",
+      finaliseImport = db
+        .update(s.tbImports)
+        .set({ status: finalStatus })
+        .where(
+          and(
+            eq(s.tbImports.id, imported.id),
+            eq(s.tbImports.tenantId, who.tenantId),
+          ),
+        ),
+      auditInsert = (
+        await prepareAuditInsert(
+          who.tenantId,
+          engagementId,
+          who.email,
+          "TRIAL_BALANCE_IMPORTED",
+          "tb_import",
+          imported.publicId,
+          {
+            version: imported.version,
+            rowCount: parsed.length,
+            isBalanced,
+            issues: issues.length,
+            sha256: digest,
+          },
+        )
+      ).statement;
+    if (analytics.length && reconciliations.length)
+      await db.batch([
+        db.insert(s.tbAnalytics).values(analytics),
+        db.insert(s.tbReconciliations).values(reconciliations),
+        finaliseImport,
+        auditInsert,
+      ]);
+    else if (analytics.length)
+      await db.batch([
+        db.insert(s.tbAnalytics).values(analytics),
+        finaliseImport,
+        auditInsert,
+      ]);
+    else if (reconciliations.length)
+      await db.batch([
+        db.insert(s.tbReconciliations).values(reconciliations),
+        finaliseImport,
+        auditInsert,
+      ]);
+    else await db.batch([finaliseImport, auditInsert]);
+    return json(await getState(who), { status: 201 });
+  } catch (error) {
+    try {
+      const failedImportId = sql<number>`(
+        SELECT ${s.tbImports.id}
+        FROM ${s.tbImports}
+        WHERE ${s.tbImports.tenantId} = ${who.tenantId}
+          AND ${s.tbImports.publicId} = ${importPublicId}
+      )`;
+      await db.batch([
+        db
+          .delete(s.tbAnalytics)
+          .where(
+            and(
+              eq(s.tbAnalytics.tenantId, who.tenantId),
+              eq(s.tbAnalytics.tbImportId, failedImportId),
+            ),
+          ),
+        db
+          .delete(s.tbReconciliations)
+          .where(
+            and(
+              eq(s.tbReconciliations.tenantId, who.tenantId),
+              eq(s.tbReconciliations.tbImportId, failedImportId),
+            ),
+          ),
+        db
+          .delete(s.tbAccounts)
+          .where(
+            and(
+              eq(s.tbAccounts.tenantId, who.tenantId),
+              eq(s.tbAccounts.tbImportId, failedImportId),
+            ),
+          ),
+        db
+          .delete(s.tbImports)
+          .where(
+            and(
+              eq(s.tbImports.tenantId, who.tenantId),
+              eq(s.tbImports.publicId, importPublicId),
+            ),
+          ),
+        db
+          .delete(s.documents)
+          .where(
+            and(
+              eq(s.documents.tenantId, who.tenantId),
+              eq(s.documents.publicId, documentPublicId),
+            ),
+          ),
+      ]);
+    } catch {
+      // Preserve the original import failure. PROCESSING marks any residue unsafe.
+    }
+    try {
+      await (
+        bucket() as R2Bucket & { delete(key: string): Promise<void> }
+      ).delete(key);
+    } catch {
+      // Database state is authoritative; orphaned storage can be swept by key.
+    }
+    throw error;
+  }
 }
 
 async function requireDifferentSigner(
@@ -767,7 +993,7 @@ async function requireDifferentSigner(
   const rows = await getDb()
     .select()
     .from(s.signoffs)
-    .where(eq(s.signoffs.engagementId, engagementId))
+    .where(and(eq(s.signoffs.engagementId, engagementId), eq(s.signoffs.tenantId, principal.tenantId)))
     .orderBy(desc(s.signoffs.id));
   const prepared = rows.find(
     (row) =>
@@ -786,7 +1012,7 @@ async function requireDifferentSigner(
   );
 }
 
-async function generateAnalytics(
+async function buildAnalytics(
   engagement: typeof s.engagements.$inferSelect,
   tbImportId: number,
 ) {
@@ -794,19 +1020,19 @@ async function generateAnalytics(
     accounts = await db
       .select()
       .from(s.tbAccounts)
-      .where(eq(s.tbAccounts.tbImportId, tbImportId)),
+      .where(and(eq(s.tbAccounts.tbImportId, tbImportId), eq(s.tbAccounts.tenantId, engagement.tenantId))),
     direction11 = (
       await db
         .select()
         .from(s.tasks)
-        .where(eq(s.tasks.engagementId, engagement.id))
+        .where(and(eq(s.tasks.engagementId, engagement.id), eq(s.tasks.tenantId, engagement.tenantId)))
     ).find((t) => t.direction === 11),
     procedure = direction11
       ? (
           await db
             .select()
             .from(s.procedures)
-            .where(eq(s.procedures.taskId, direction11.id))
+            .where(and(eq(s.procedures.taskId, direction11.id), eq(s.procedures.tenantId, engagement.tenantId)))
         ).find((p) => p.sequence === 1)
       : undefined,
     threshold =
@@ -828,6 +1054,7 @@ async function generateAnalytics(
           ? 100
           : 0,
       base = {
+        tenantId: engagement.tenantId,
         engagementId: engagement.id,
         tbImportId,
         accountId: account.id,
@@ -900,7 +1127,30 @@ async function generateAnalytics(
         severity: "MEDIUM",
       });
   }
-  if (values.length) await db.insert(s.tbAnalytics).values(values);
+  return values;
+}
+
+function buildInitialReconciliations(
+  accounts: Array<{ statementLine: string; currentBalance: number }>,
+  engagementId: number,
+  tbImportId: number,
+  tenantId: string,
+) {
+  const lines = new Map<string, number>();
+  for (const account of accounts)
+    if (account.statementLine !== "UNMAPPED")
+      lines.set(
+        account.statementLine,
+        (lines.get(account.statementLine) || 0) + account.currentBalance,
+      );
+  return [...lines].map(([statementLine, tbAmount]) => ({
+    tenantId,
+    engagementId,
+    tbImportId,
+    statementLine,
+    tbAmount,
+    difference: tbAmount,
+  }));
 }
 function safeJsonArray(value: string) {
   try {
@@ -910,53 +1160,79 @@ function safeJsonArray(value: string) {
     return ["Invalid validation record"];
   }
 }
-async function rebuildReconciliations(
+async function prepareReconciliationStatements(
   engagementId: number,
   tbImportId: number,
+  tenantId: string,
+  accountOverride?: { accountId: number; statementLine: string },
 ) {
   const db = getDb(),
     accounts = await db
       .select()
       .from(s.tbAccounts)
-      .where(eq(s.tbAccounts.tbImportId, tbImportId)),
+      .where(and(eq(s.tbAccounts.tbImportId, tbImportId), eq(s.tbAccounts.tenantId, tenantId))),
     existing = await db
       .select()
       .from(s.tbReconciliations)
-      .where(eq(s.tbReconciliations.tbImportId, tbImportId)),
+      .where(and(eq(s.tbReconciliations.tbImportId, tbImportId), eq(s.tbReconciliations.tenantId, tenantId))),
     lines = new Map<string, number>();
-  for (const account of accounts)
+  for (const storedAccount of accounts) {
+    const account =
+      storedAccount.id === accountOverride?.accountId
+        ? { ...storedAccount, statementLine: accountOverride.statementLine }
+        : storedAccount;
     if (account.statementLine !== "UNMAPPED")
       lines.set(
         account.statementLine,
         (lines.get(account.statementLine) || 0) + account.currentBalance,
       );
+  }
+  const statements = [];
   for (const row of existing)
     if (!lines.has(row.statementLine))
-      await db
-        .delete(s.tbReconciliations)
-        .where(eq(s.tbReconciliations.id, row.id));
+      statements.push(
+        db
+          .delete(s.tbReconciliations)
+          .where(
+            and(
+              eq(s.tbReconciliations.id, row.id),
+              eq(s.tbReconciliations.tenantId, tenantId),
+            ),
+          ),
+      );
   for (const [statementLine, tbAmount] of lines) {
     const row = existing.find((x) => x.statementLine === statementLine);
     if (row)
-      await db
-        .update(s.tbReconciliations)
-        .set({
-          tbAmount,
-          difference: tbAmount - row.accountsAmount,
-          status: close(tbAmount, row.accountsAmount)
-            ? "RECONCILED"
-            : row.explanation
-              ? "EXPLAINED"
-              : "NOT_RECONCILED",
-        })
-        .where(eq(s.tbReconciliations.id, row.id));
+      statements.push(
+        db
+          .update(s.tbReconciliations)
+          .set({
+            tbAmount,
+            difference: tbAmount - row.accountsAmount,
+            status: close(tbAmount, row.accountsAmount)
+              ? "RECONCILED"
+              : row.explanation
+                ? "EXPLAINED"
+                : "NOT_RECONCILED",
+          })
+          .where(
+            and(
+              eq(s.tbReconciliations.id, row.id),
+              eq(s.tbReconciliations.tenantId, tenantId),
+            ),
+          ),
+      );
     else
-      await db.insert(s.tbReconciliations).values({
-        engagementId,
-        tbImportId,
-        statementLine,
-        tbAmount,
-        difference: tbAmount,
-      });
+      statements.push(
+        db.insert(s.tbReconciliations).values({
+          tenantId,
+          engagementId,
+          tbImportId,
+          statementLine,
+          tbAmount,
+          difference: tbAmount,
+        }),
+      );
   }
+  return statements;
 }

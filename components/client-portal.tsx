@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Logo } from "./logo";
 import { ClientMessages } from "./client-messages";
-import type { AppState, EvidenceRequest } from "@/lib/types";
+import type { AppState, EvidenceRequest, PublicId } from "@/lib/types";
 import {
   choosePortalEngagement,
   isRequestOverdue,
@@ -37,17 +37,17 @@ type PortalReceipt = {
 
 export function ClientPortal({ previewMode = false }: { previewMode?: boolean }) {
   const [state, setState] = useState<AppState | null>(null);
-  const [engagementId, setEngagementId] = useState<number | null>(null);
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [drafts, setDrafts] = useState<Record<number, ResponseDraft>>({});
+  const [engagementId, setEngagementId] = useState<PublicId | null>(null);
+  const [expanded, setExpanded] = useState<PublicId | null>(null);
+  const [drafts, setDrafts] = useState<Record<PublicId, ResponseDraft>>({});
   const [portalView, setPortalView] = useState<"overview" | "messages">("overview");
-  const [portalThreadId, setPortalThreadId] = useState<number | null>(null);
-  const [busyRequestId, setBusyRequestId] = useState<number | null>(null);
+  const [portalThreadId, setPortalThreadId] = useState<PublicId | null>(null);
+  const [busyRequestId, setBusyRequestId] = useState<PublicId | null>(null);
   const [loading, setLoading] = useState(true);
   const [receipt, setReceipt] = useState<PortalReceipt | null>(null);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
-  const load = async (preferredEngagementId?: number | null) => {
+  const load = async (preferredEngagementId?: PublicId | null) => {
     const r = await fetch("/api/state", { cache: "no-store" });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "The client portal could not be opened");
@@ -56,16 +56,16 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
     const requestedValue = new URLSearchParams(window.location.search).get(
       "engagement",
     );
-    const requested = requestedValue ? Number(requestedValue) : null;
+    const requested = requestedValue || null;
     const chosen = choosePortalEngagement(
-      j.engagements.map((item: { id: number }) => item.id),
+      j.engagements.map((item: { id: PublicId }) => item.id),
       preferredEngagementId ?? engagementId,
       requested,
     );
     setEngagementId(chosen);
     setExpanded((current) => {
       const currentIsOutstanding = j.requests.some(
-        (item: { id: number; engagementId: number; status: string }) =>
+        (item: { id: PublicId; engagementId: PublicId; status: string }) =>
           item.id === current &&
           item.engagementId === chosen &&
           item.status !== "RECEIVED",
@@ -73,7 +73,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
       if (currentIsOutstanding) return current;
       return (
         j.requests.find(
-          (item: { engagementId: number; status: string }) =>
+          (item: { engagementId: PublicId; status: string }) =>
             item.engagementId === chosen && item.status !== "RECEIVED",
         )?.id ?? null
       );
@@ -225,7 +225,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
         engagementThreadIds.has(participant.threadId) &&
         participant.participantType === "PRACTICE",
     )?.name ?? "Examination team";
-  const updateDraft = (requestId: number, change: Partial<ResponseDraft>) =>
+  const updateDraft = (requestId: PublicId, change: Partial<ResponseDraft>) =>
     setDrafts((current) => ({
       ...current,
       [requestId]: {
@@ -234,7 +234,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
         ...change,
       },
     }));
-  const selectEngagement = (id: number) => {
+  const selectEngagement = (id: PublicId) => {
     setEngagementId(id);
     setPortalView("overview");
     setPortalThreadId(null);
@@ -263,7 +263,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
               <select
                 aria-label="Select annual engagement"
                 value={engagement.id}
-                onChange={(event) => selectEngagement(Number(event.target.value))}
+                onChange={(event) => selectEngagement(event.target.value)}
               >
                 {state.engagements.map((item) => (
                   <option value={item.id} key={item.id}>
@@ -374,7 +374,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
             <p className="eyebrow">{client.name.toUpperCase()}</p>
             <h1>Welcome, {portalUserName.split(" ")[0] || "client"}</h1>
             <p>
-              D O&apos;Higgins &amp; Co is completing your independent
+              {state.practiceName} is completing your independent
               examination for the year ended {fmt(engagement.periodEnd)}.
             </p>
           </div>

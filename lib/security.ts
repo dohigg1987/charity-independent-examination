@@ -32,6 +32,7 @@ export function requireContentType(
 }
 
 export async function enforceRateLimit(
+  tenantId: string,
   key: string,
   limit: number,
   windowMs: number,
@@ -42,13 +43,13 @@ export async function enforceRateLimit(
     await db
       .select()
       .from(s.rateLimits)
-      .where(eq(s.rateLimits.key, key))
+      .where(eq(s.rateLimits.key, `${tenantId}:${key}`))
       .limit(1)
   )[0];
   if (!row || now - row.windowStart >= windowMs) {
     await db
       .insert(s.rateLimits)
-      .values({ key, windowStart: now, count: 1 })
+      .values({ tenantId, key: `${tenantId}:${key}`, windowStart: now, count: 1 })
       .onConflictDoUpdate({
         target: s.rateLimits.key,
         set: { windowStart: now, count: 1 },
@@ -60,5 +61,5 @@ export async function enforceRateLimit(
   await db
     .update(s.rateLimits)
     .set({ count: row.count + 1 })
-    .where(eq(s.rateLimits.key, key));
+    .where(eq(s.rateLimits.key, `${tenantId}:${key}`));
 }

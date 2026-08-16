@@ -36,6 +36,59 @@ test("revised thresholds apply from 30 September 2026", () => {
   assert.equal(result.thresholds.auditIncome, 1_500_000);
 });
 
+test("the day before commencement continues to use the former examination floor", () => {
+  assert.equal(
+    assessEligibility("2026-09-29", 40_000, 100_000).scrutiny,
+    "INDEPENDENT_EXAMINATION",
+  );
+});
+
+test("income immediately above the revised floor requires examination", () => {
+  assert.equal(
+    assessEligibility("2026-09-30", 40_001, 100_000).scrutiny,
+    "INDEPENDENT_EXAMINATION",
+  );
+});
+
+test("the revised examiner qualification threshold is strictly over 500000", () => {
+  assert.equal(
+    assessEligibility("2026-09-30", 500_000, 100_000)
+      .qualifiedExaminerRequired,
+    false,
+  );
+  assert.equal(
+    assessEligibility("2026-09-30", 500_001, 100_000)
+      .qualifiedExaminerRequired,
+    true,
+  );
+});
+
+test("the revised income audit threshold is strictly over 1500000", () => {
+  assert.equal(
+    assessEligibility("2026-09-30", 1_500_000, 100_000).scrutiny,
+    "INDEPENDENT_EXAMINATION",
+  );
+  assert.equal(
+    assessEligibility("2026-09-30", 1_500_001, 100_000).scrutiny,
+    "AUDIT",
+  );
+});
+
+test("the revised asset audit test requires both thresholds to be exceeded", () => {
+  assert.equal(
+    assessEligibility("2026-09-30", 500_000, 5_000_001).scrutiny,
+    "INDEPENDENT_EXAMINATION",
+  );
+  assert.equal(
+    assessEligibility("2026-09-30", 500_001, 5_000_000).scrutiny,
+    "INDEPENDENT_EXAMINATION",
+  );
+  assert.equal(
+    assessEligibility("2026-09-30", 500_001, 5_000_001).scrutiny,
+    "AUDIT",
+  );
+});
+
 test("an overriding audit requirement always routes to audit", () => {
   assert.equal(
     assessEligibility("2026-09-30", 100_000, 100_000, { funderAudit: true })

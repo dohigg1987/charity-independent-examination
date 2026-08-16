@@ -14,6 +14,7 @@ export type InternalRole = (typeof INTERNAL_ROLES)[number];
 export type ClientRole = (typeof CLIENT_ROLES)[number];
 
 export type Principal = {
+  tenantId: string;
   kind: "INTERNAL" | "CLIENT";
   email: string;
   name: string;
@@ -81,9 +82,11 @@ export function canRespondForClient(
 export function canAccessClient(
   principal: Principal,
   clientId: number,
+  tenantId: string,
 ): boolean {
   return (
-    principal.kind === "INTERNAL" || principal.clientIds.includes(clientId)
+    principal.tenantId === tenantId &&
+    (principal.kind === "INTERNAL" || principal.clientIds.includes(clientId))
   );
 }
 

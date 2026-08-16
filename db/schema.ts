@@ -8,29 +8,52 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const tenants = sqliteTable("tenants", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  status: text("status").notNull().default("ACTIVE"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+const tenantColumns = () => ({
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id),
+  publicId: text("public_id")
+    .notNull()
+    .unique()
+    .$defaultFn(() => crypto.randomUUID()),
+});
+
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  email: text("email").notNull().unique(),
+  ...tenantColumns(),
+  email: text("email").notNull(),
   name: text("name").notNull(),
   role: text("role").notNull().default("EXAMINER"),
   status: text("status").notNull().default("ACTIVE"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
-});
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("users_tenant_email_unique").on(table.tenantId, table.email),
+  index("users_tenant_status_idx").on(table.tenantId, table.status),
+]);
 export const clients = sqliteTable("clients", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   name: text("name").notNull(),
-  charityNumber: text("charity_number").notNull().unique(),
+  charityNumber: text("charity_number").notNull(),
   companyNumber: text("company_number"),
   legalForm: text("legal_form").notNull(),
   contactName: text("contact_name").notNull(),
   contactEmail: text("contact_email").notNull(),
   status: text("status").notNull().default("ACTIVE"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
-});
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("clients_tenant_charity_unique").on(table.tenantId, table.charityNumber),
+  index("clients_tenant_status_idx").on(table.tenantId, table.status),
+]);
 export const jurisdictions = sqliteTable("jurisdictions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull().unique(),
@@ -98,7 +121,9 @@ export const organisationTypes = sqliteTable("organisation_types", {
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 export const practiceSettings = sqliteTable("practice_settings", {
-  id: integer("id").primaryKey().default(1),
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id),
   concernReviewMode: text("concern_review_mode")
     .notNull()
     .default("EXAMINER_JUDGEMENT"),
@@ -127,6 +152,7 @@ export const engagements = sqliteTable(
   "engagements",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     clientId: integer("client_id")
       .notNull()
       .references(() => clients.id),
@@ -138,6 +164,7 @@ export const engagements = sqliteTable(
     materiality: real("materiality").notNull().default(0),
     risk: text("risk").notNull().default("STANDARD"),
     status: text("status").notNull().default("PLANNING"),
+    rowVersion: integer("row_version").notNull().default(1),
     jurisdiction: text("jurisdiction").notNull().default("ENGLAND_WALES"),
     jurisdictionRuleSetId: integer("jurisdiction_rule_set_id").references(
       () => jurisdictionRuleSets.id,
@@ -194,12 +221,16 @@ export const engagements = sqliteTable(
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [index("engagements_client_id_idx").on(table.clientId)],
+  (table) => [
+    index("engagements_tenant_client_idx").on(table.tenantId, table.clientId),
+    uniqueIndex("engagements_tenant_public_unique").on(table.tenantId, table.publicId),
+  ],
 );
 export const tasks = sqliteTable(
   "tasks",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
@@ -212,6 +243,7 @@ export const tasks = sqliteTable(
       .notNull()
       .default(false),
     status: text("status").notNull().default("NOT_STARTED"),
+    rowVersion: integer("row_version").notNull().default(1),
     conclusion: text("conclusion").notNull().default(""),
     preparedBy: text("prepared_by"),
     preparedAt: text("prepared_at"),
@@ -221,12 +253,13 @@ export const tasks = sqliteTable(
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [index("tasks_engagement_id_idx").on(table.engagementId)],
+  (table) => [index("tasks_tenant_engagement_idx").on(table.tenantId, table.engagementId)],
 );
 export const procedures = sqliteTable(
   "procedures",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     taskId: integer("task_id")
       .notNull()
       .references(() => tasks.id),
@@ -245,6 +278,7 @@ export const procedures = sqliteTable(
     workPerformed: text("work_performed").notNull().default(""),
     conclusion: text("conclusion").notNull().default(""),
     status: text("status").notNull().default("NOT_STARTED"),
+    rowVersion: integer("row_version").notNull().default(1),
     preparedBy: text("prepared_by"),
     preparedAt: text("prepared_at"),
     reviewedBy: text("reviewed_by"),
@@ -255,10 +289,11 @@ export const procedures = sqliteTable(
     completedBy: text("completed_by"),
     completedAt: text("completed_at"),
   },
-  (table) => [index("procedures_task_id_idx").on(table.taskId)],
+  (table) => [index("procedures_tenant_task_idx").on(table.tenantId, table.taskId)],
 );
 export const workpaperVersions = sqliteTable("workpaper_versions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   taskId: integer("task_id")
     .notNull()
     .references(() => tasks.id),
@@ -275,12 +310,13 @@ export const evidenceRequests = sqliteTable(
   "evidence_requests",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
     taskId: integer("task_id").references(() => tasks.id),
     procedureId: integer("procedure_id").references(() => procedures.id),
-    reference: text("reference").notNull().unique(),
+    reference: text("reference").notNull(),
     title: text("title").notNull(),
     description: text("description").notNull(),
     contactName: text("contact_name").notNull(),
@@ -295,12 +331,14 @@ export const evidenceRequests = sqliteTable(
   (table) => [
     index("evidence_requests_engagement_id_idx").on(table.engagementId),
     index("evidence_requests_task_id_idx").on(table.taskId),
+    uniqueIndex("evidence_requests_tenant_reference_unique").on(table.tenantId, table.reference),
   ],
 );
 export const conversationThreads = sqliteTable(
   "conversation_threads",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
@@ -309,6 +347,7 @@ export const conversationThreads = sqliteTable(
     category: text("category").notNull().default("GENERAL"),
     priority: text("priority").notNull().default("NORMAL"),
     status: text("status").notNull().default("OPEN"),
+    rowVersion: integer("row_version").notNull().default(1),
     assignedTo: text("assigned_to"),
     createdBy: text("created_by").notNull(),
     lastMessageAt: text("last_message_at")
@@ -334,6 +373,7 @@ export const conversationParticipants = sqliteTable(
   "conversation_participants",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     threadId: integer("thread_id")
       .notNull()
       .references(() => conversationThreads.id),
@@ -360,6 +400,7 @@ export const conversationMessages = sqliteTable(
   "conversation_messages",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     threadId: integer("thread_id")
       .notNull()
       .references(() => conversationThreads.id),
@@ -382,6 +423,7 @@ export const documents = sqliteTable(
   "documents",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
@@ -421,6 +463,7 @@ export const documents = sqliteTable(
 );
 export const permanentDocuments = sqliteTable("permanent_documents", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   clientId: integer("client_id")
     .notNull()
     .references(() => clients.id),
@@ -438,6 +481,7 @@ export const permanentDocuments = sqliteTable("permanent_documents", {
 });
 export const comments = sqliteTable("comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   engagementId: integer("engagement_id")
     .notNull()
     .references(() => engagements.id),
@@ -453,6 +497,7 @@ export const comments = sqliteTable("comments", {
 });
 export const reviewNotes = sqliteTable("review_notes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   engagementId: integer("engagement_id")
     .notNull()
     .references(() => engagements.id),
@@ -472,6 +517,7 @@ export const reviewNotes = sqliteTable("review_notes", {
 });
 export const signoffs = sqliteTable("signoffs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   engagementId: integer("engagement_id")
     .notNull()
     .references(() => engagements.id),
@@ -487,6 +533,7 @@ export const signoffs = sqliteTable("signoffs", {
 });
 export const invitations = sqliteTable("invitations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   engagementId: integer("engagement_id")
     .notNull()
     .references(() => engagements.id),
@@ -501,6 +548,7 @@ export const invitations = sqliteTable("invitations", {
 });
 export const trustees = sqliteTable("trustees", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   clientId: integer("client_id")
     .notNull()
     .references(() => clients.id),
@@ -519,6 +567,7 @@ export const clientUsers = sqliteTable(
   "client_users",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     clientId: integer("client_id")
       .notNull()
       .references(() => clients.id),
@@ -534,12 +583,14 @@ export const clientUsers = sqliteTable(
   (table) => [
     index("client_users_client_id_idx").on(table.clientId),
     index("client_users_email_idx").on(table.email),
+    uniqueIndex("client_users_tenant_client_email_unique").on(table.tenantId, table.clientId, table.email),
   ],
 );
 export const auditEvents = sqliteTable(
   "audit_events",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id").references(() => engagements.id),
     actorEmail: text("actor_email").notNull(),
     action: text("action").notNull(),
@@ -547,7 +598,7 @@ export const auditEvents = sqliteTable(
     entityId: text("entity_id").notNull(),
     detail: text("detail").notNull().default("{}"),
     previousHash: text("previous_hash"),
-    eventHash: text("event_hash"),
+    eventHash: text("event_hash").notNull(),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
@@ -557,8 +608,42 @@ export const auditEvents = sqliteTable(
     index("audit_events_created_at_idx").on(table.createdAt),
   ],
 );
+export const auditHeads = sqliteTable("audit_heads", {
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id),
+  lastHash: text("last_hash"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+/**
+ * Immutable boundary for audit rows that existed before enforced SHA-256
+ * chaining. Rows through lastEventId use the documented deterministic legacy
+ * fingerprint; later audit rows use the application SHA-256 canonical form.
+ */
+export const auditLegacySeals = sqliteTable("audit_legacy_seals", {
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id),
+  algorithm: text("algorithm")
+    .notNull()
+    .default("FNV1A32X8-CODEPOINT-V1"),
+  canonicalVersion: text("canonical_version")
+    .notNull()
+    .default("clarity-ie-legacy-audit-v1"),
+  firstEventId: integer("first_event_id")
+    .notNull()
+    .references(() => auditEvents.id),
+  lastEventId: integer("last_event_id")
+    .notNull()
+    .references(() => auditEvents.id),
+  eventCount: integer("event_count").notNull(),
+  genesisHash: text("genesis_hash").notNull(),
+  anchorHash: text("anchor_hash").notNull(),
+  sealedAt: text("sealed_at").notNull(),
+});
 export const rateLimits = sqliteTable("rate_limits", {
   key: text("key").primaryKey(),
+  tenantId: text("tenant_id").references(() => tenants.id),
   windowStart: integer("window_start").notNull(),
   count: integer("count").notNull().default(0),
 });
@@ -566,6 +651,7 @@ export const concerns = sqliteTable(
   "concerns",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
@@ -578,6 +664,7 @@ export const concerns = sqliteTable(
     description: text("description").notNull(),
     severity: text("severity").notNull().default("MEDIUM"),
     status: text("status").notNull().default("OPEN"),
+    rowVersion: integer("row_version").notNull().default(1),
     targetedResponse: text("targeted_response").notNull().default(""),
     managementResponse: text("management_response").notNull().default(""),
     examinerConclusion: text("examiner_conclusion").notNull().default(""),
@@ -606,7 +693,7 @@ export const concerns = sqliteTable(
       .default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
-    uniqueIndex("concerns_reference_idx").on(table.reference),
+    uniqueIndex("concerns_tenant_reference_unique").on(table.tenantId, table.reference),
     index("concerns_engagement_id_idx").on(table.engagementId),
     index("concerns_status_idx").on(table.status),
   ],
@@ -615,6 +702,7 @@ export const concernEvents = sqliteTable(
   "concern_events",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     concernId: integer("concern_id")
       .notNull()
       .references(() => concerns.id),
@@ -637,6 +725,7 @@ export const concernEvents = sqliteTable(
 );
 export const fileLockEvents = sqliteTable("file_lock_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ...tenantColumns(),
   engagementId: integer("engagement_id")
     .notNull()
     .references(() => engagements.id),
@@ -652,6 +741,7 @@ export const tbImports = sqliteTable(
   "tb_imports",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
@@ -684,6 +774,7 @@ export const tbAccounts = sqliteTable(
   "tb_accounts",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     tbImportId: integer("tb_import_id")
       .notNull()
       .references(() => tbImports.id),
@@ -708,6 +799,7 @@ export const tbAnalytics = sqliteTable(
   "tb_analytics",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
@@ -750,6 +842,7 @@ export const tbReconciliations = sqliteTable(
   "tb_reconciliations",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
     engagementId: integer("engagement_id")
       .notNull()
       .references(() => engagements.id),
