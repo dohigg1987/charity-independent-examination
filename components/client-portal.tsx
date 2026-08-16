@@ -654,7 +654,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
       </main>
       <footer className="portal-footer">
         <span>
-          Powered by <strong>clarity</strong>
+          Powered by <strong>Clarity IE</strong>
         </span>
         <span>Secure engagement workspace</span>
       </footer>
