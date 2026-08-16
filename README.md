@@ -1,49 +1,114 @@
 # Clarity IE
 
-Clarity IE is a controlled workflow application for independent examinations of charity accounts in England and Wales. It combines portfolio management, the 13 mandatory CC32 Directions, indexed workpapers, evidence requests, reviewer notes, sign-off gates, reporting and a secure client portal.
+Clarity IE is a controlled workflow platform for UK charity independent-examination engagements. It supports permanent files, annual engagement files, the Charity Commission Directions, procedure-level evidence and sign-off, review notes, trial-balance analytics, client evidence requests, secure messaging, reporting and practice administration.
 
-## Current release
+The methodology is designed for a limited-assurance independent examination. It is not an audit programme and automated thresholds do not replace the examiner's judgement.
 
-The initial release provides a fully navigable product interface with interactive engagement, workpaper, request, review, reporting and client-portal flows. It also includes the production PostgreSQL domain model, eligibility rules, security headers, automated tests and CI. The interface currently uses illustrative in-browser data. Authentication, persistence, object storage, notification delivery and malware scanning must be connected before operational use.
+## Quality and security
 
-## Run locally
+- Run the complete release gate with `npm test` followed by `npm audit` and `git diff --check`.
+- Security design and residual controls are in [SECURITY.md](SECURITY.md).
+- The commercial release gate is in [docs/RELEASE_STANDARD.md](docs/RELEASE_STANDARD.md).
+- Operating and data-governance responsibilities are in [docs/OPERATIONS.md](docs/OPERATIONS.md) and [docs/DATA_GOVERNANCE.md](docs/DATA_GOVERNANCE.md).
 
-```bash
-npm ci
-npm run dev
+## Prerequisites
+
+- Node.js `>=22.13.0`
+- Linux with `flock`, `curl`, and GNU `timeout`
+
+## Sites Lifecycle
+
+The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
+
+Production binding values are supplied by Sites. `wrangler.preview.jsonc` contains placeholder-only local bindings and is used exclusively to apply migrations to the isolated development preview.
+
+`install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout and then validates the Sites artifact. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
+
+Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
+
+## Technical shape
+
+- Vinext, React and Cloudflare Workers provide the application runtime.
+- D1 stores engagement, workflow, access and audit records; R2 stores controlled documents.
+- Drizzle defines the schema and additive migrations.
+- ChatGPT sign-in supplies identity, while application roles and client assignments enforce authorization.
+- Production requests fail closed when an identity is not registered and active.
+
+## Workspace Auth Headers
+
+OpenAI workspace sites can read the current user's email from
+`oai-authenticated-user-email`.
+
+SIWC-authenticated workspace sites may also receive
+`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
+`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
+`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+
+Treat the full name as optional and fall back to email when it is absent:
+
+```tsx
+import { headers } from "next/headers";
+
+export default async function Home() {
+  const requestHeaders = await headers();
+  const email = requestHeaders.get("oai-authenticated-user-email");
+  const encodedFullName = requestHeaders.get(
+    "oai-authenticated-user-full-name",
+  );
+  const fullName =
+    encodedFullName &&
+    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
+      "percent-encoded-utf-8"
+      ? decodeURIComponent(encodedFullName)
+      : null;
+
+  const displayName = fullName ?? email;
+  // ...
+}
 ```
 
-Open `http://localhost:3000` for the examiner workspace and `http://localhost:3000/client` for the client portal.
+## Optional Dispatch-Owned ChatGPT Sign-In
 
-## Quality checks
+Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
+optional or required ChatGPT sign-in:
 
-```bash
-npm run typecheck
-npm test
-npm run build
-```
+- Use `getChatGPTUser()` for optional signed-in UI.
+- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
+  anonymous visitors through Sign in with ChatGPT.
+- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
+  browser links or actions.
+- Pass a same-origin relative `returnTo` path for the destination after sign-in
+  or sign-out. The helper validates and safely encodes it.
+- Mark protected pages with `export const dynamic = "force-dynamic"` because
+  they depend on per-request identity headers.
 
-## Regulatory basis
+Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
+OAuth cookies, and identity header injection. Do not implement app routes for
+those reserved paths. Routes that do not import and call the helper remain
+anonymous-compatible.
 
-The work programme reflects the Charity Commission's *Independent examination of charity accounts: Directions and guidance for examiners (CC32)*. Each engagement records the approach taken to all applicable Directions and separately assesses statutory matters of material significance and discretionary reports to the Commission. This software supports, but does not replace, the examiner's professional judgement or responsibility to verify current law, thresholds and guidance for each engagement.
+SIWC establishes identity only; it does not prove workspace membership. Use the
+Sites hosting platform's access policy controls for workspace-wide restrictions,
+or enforce explicit server-side membership or allowlist checks.
 
-Key sources:
+Use SIWC for account pages, user-specific dashboards, saved records, and write
+actions tied to the current ChatGPT user. Leave public content anonymous.
 
-- [CC32 directions and guidance](https://www.gov.uk/government/publications/independent-examination-of-charity-accounts-examiners-cc32)
-- [Charity reporting and accounting essentials, CC15d](https://www.gov.uk/government/publications/charity-reporting-and-accounting-the-essentials-november-2016-cc15d)
-- [Serious incident reporting guidance](https://www.gov.uk/guidance/how-to-report-a-serious-incident-in-your-charity)
+## Diagnostic Commands
 
-## Architecture
+- `npm run install:ci`: perform the one bounded lockfile install
+- `npm run dev`: start the Vite/Vinext development server
+- `npm run build`: build and validate the deployable Sites artifact
+- `npm run start`: start the built Vinext application
+- `npm test`: build, validate, and verify the rendered development-preview metadata
+- `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
+- `npm run db:generate`: generate Drizzle migrations after schema changes
 
-- Next.js and TypeScript presentation and application layer
-- PostgreSQL schema with tenant-scoped records and explicit engagement assignments
-- Versioned, hash-addressed workpapers and evidence documents
-- Immutable sign-off snapshots and append-only audit events
-- Object-storage metadata designed for encryption, malware scanning and retention controls
-- Role model covering practice owners, examiners, reviewers, team members and client users
+Use build and validation commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
 
-See [docs/CONTROL-FRAMEWORK.md](docs/CONTROL-FRAMEWORK.md), [SECURITY.md](SECURITY.md) and [docs/PRODUCTION-ROADMAP.md](docs/PRODUCTION-ROADMAP.md).
+The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
 
-## Important deployment condition
+## Learn More
 
-This repository must be private before it is used for live work. Client data, credentials, encryption keys and uploaded evidence must never be committed to Git.
+- [vinext Documentation](https://github.com/cloudflare/vinext)
+- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)

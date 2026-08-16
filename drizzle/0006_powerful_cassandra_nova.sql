@@ -1,0 +1,1 @@
+ALTER TABLE `trustees` ADD `person_type` text DEFAULT 'TRUSTEE' NOT NULL;
