@@ -171,10 +171,15 @@ export function OperationalWorkspace() {
     state.engagements[0];
   if (!active)
     return (
-      <div className="loading-screen">
-        <Logo />
-        <p>Create the first engagement to begin.</p>
-      </div>
+      <FirstRunWorkspace
+        state={state}
+        dialog={dialog}
+        setDialog={setDialog}
+        mutate={mutate}
+        notify={notify}
+        error={error}
+        toast={toast}
+      />
     );
   const activeTask =
       state.tasks.find(
@@ -612,6 +617,76 @@ export function OperationalWorkspace() {
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function FirstRunWorkspace({
+  state,
+  dialog,
+  setDialog,
+  mutate,
+  notify,
+  error,
+  toast,
+}: {
+  state: AppState;
+  dialog: Dialog;
+  setDialog: (dialog: Dialog) => void;
+  mutate: Mutate;
+  notify: Notify;
+  error: string;
+  toast: string;
+}) {
+  const hasClient = state.clients.length > 0;
+  const firstName = state.actor.name.split(" ")[0] || state.actor.name;
+  return (
+    <div className="first-run-shell">
+      <header className="first-run-header">
+        <Logo />
+        <div>
+          <span className="first-run-identity">
+            <span className="avatar">{initials(state.actor.name)}</span>
+            <span><strong>{state.actor.name}</strong><small>{state.actor.email}</small></span>
+          </span>
+          <Link href="/auth/sign-out" className="first-run-signout">Sign out</Link>
+        </div>
+      </header>
+      <main className="first-run-main">
+        <section className="first-run-intro">
+          <p className="eyebrow">PRACTICE SETUP</p>
+          <h1>Welcome to Clarity IE, {firstName}.</h1>
+          <p>Your secure practice workspace is ready. Complete these two short steps to open your first independent examination file.</p>
+          <div className="first-run-assurance">
+            <ShieldCheck />
+            <span><strong>Your practice is active</strong><small>{state.practiceName} · Administrator access</small></span>
+          </div>
+        </section>
+        <section className="first-run-card" aria-label="Getting started">
+          <header>
+            <div><p className="eyebrow">GETTING STARTED</p><h2>Set up your first engagement</h2></div>
+            <span>{hasClient ? "1 of 2 complete" : "Ready to begin"}</span>
+          </header>
+          <ol className="first-run-steps">
+            <li className={hasClient ? "complete" : "current"}>
+              <span className="step-number">{hasClient ? <Check /> : "1"}</span>
+              <div><strong>Add the charity</strong><p>Record the charity, registration number and primary contact.</p>{hasClient && <small>{state.clients[0].name} added</small>}</div>
+              <button className={hasClient ? "secondary" : "primary"} onClick={() => setDialog({ kind: "client" })}><Plus />{hasClient ? "Add another" : "Add charity"}</button>
+            </li>
+            <li className={hasClient ? "current" : "locked"}>
+              <span className="step-number">2</span>
+              <div><strong>Create the engagement</strong><p>Choose the reporting period, jurisdiction and accounting basis.</p></div>
+              <button className="primary" disabled={!hasClient} onClick={() => setDialog({ kind: "engagement" })}><BookOpenCheck />Create engagement</button>
+            </li>
+          </ol>
+          <footer><LockKeyhole /><span><strong>Private by default</strong>Your client records and examination files are only visible to authorised practice users.</span></footer>
+        </section>
+      </main>
+      {error && <div className="error-banner first-run-error"><AlertTriangle />{error}</div>}
+      {dialog && (
+        <DialogView dialog={dialog} close={() => setDialog(null)} state={state} mutate={mutate} notify={notify} />
+      )}
+      {toast && <div className="toast"><CheckCircle2 />{toast}</div>}
     </div>
   );
 }
@@ -3237,7 +3312,7 @@ function DialogView({
   dialog: NonNullable<Dialog>;
   close: () => void;
   state: AppState;
-  active: Engagement;
+  active?: Engagement;
   mutate: Mutate;
   notify: Notify;
 }) {
@@ -3290,7 +3365,7 @@ function DialogView({
     }
     if (dialog.kind === "request") {
       action = "createRequest";
-      payload = { ...d, engagementId: active.id };
+      payload = { ...d, engagementId: active!.id };
     }
     if (dialog.kind === "requestDetail") {
       const { reply, ...requestData } = d;
@@ -3308,7 +3383,7 @@ function DialogView({
     }
     if (dialog.kind === "review") {
       action = "createReviewNote";
-      payload = { ...d, engagementId: active.id };
+      payload = { ...d, engagementId: active!.id };
     }
     if (dialog.kind === "clear") {
       action = "resolveNote";
@@ -3321,7 +3396,7 @@ function DialogView({
     }
     if (dialog.kind === "task") {
       action = "createTask";
-      payload = { ...d, engagementId: active.id };
+      payload = { ...d, engagementId: active!.id };
     }
     await mutate(action, payload);
     close();
@@ -3468,13 +3543,13 @@ function DialogView({
               <select name="procedureId">
                 <option value="">Engagement level</option>
                 {state.tasks
-                  .filter((t) => t.engagementId === active.id)
+                  .filter((t) => t.engagementId === active!.id)
                   .flatMap((t) =>
                     state.procedures
                       .filter((p) => p.taskId === t.id)
                       .map((p) => (
                         <option value={p.id} key={p.id}>
-                          {regulatoryUnit(active.jurisdiction)} {t.direction}, procedure {t.direction}.
+                          {regulatoryUnit(active!.jurisdiction)} {t.direction}, procedure {t.direction}.
                           {p.sequence}: {p.text}
                         </option>
                       )),
@@ -3490,7 +3565,7 @@ function DialogView({
               n="contactName"
               l="Client contact"
               v={
-                state.clients.find((c) => c.id === active.clientId)?.contactName
+                state.clients.find((c) => c.id === active!.clientId)?.contactName
               }
             />
             <Field
@@ -3498,7 +3573,7 @@ function DialogView({
               l="Contact email"
               type="email"
               v={
-                state.clients.find((c) => c.id === active.clientId)
+                state.clients.find((c) => c.id === active!.clientId)
                   ?.contactEmail
               }
             />
@@ -3575,7 +3650,7 @@ function DialogView({
               <select name="taskId">
                 <option value="">Engagement level</option>
                 {state.tasks
-                  .filter((t) => t.engagementId === active.id)
+                  .filter((t) => t.engagementId === active!.id)
                   .map((t) => (
                     <option value={t.id} key={t.id}>
                       Task {t.direction}: {t.title}
