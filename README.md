@@ -16,7 +16,13 @@ The methodology is designed for a limited-assurance independent examination. It 
 - Node.js `>=22.13.0`
 - Linux with `flock`, `curl`, and GNU `timeout`
 
-## Sites Lifecycle
+## Production deployment
+
+GitHub is the authoritative source. The independent Cloudflare + Neon architecture, four isolated environments and promotion controls are documented in [docs/PRODUCTION_ARCHITECTURE.md](docs/PRODUCTION_ARCHITECTURE.md). Clarity IE does not share infrastructure, identity, secrets or data with QuoteBench.
+
+The legacy Sites/D1 preview remains available only for isolated local UI development while production uses Neon through Cloudflare Hyperdrive and application-owned Neon Auth.
+
+## Legacy Sites preview
 
 The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
 
@@ -112,3 +118,4 @@ The timeout defaults can be overridden for a controlled canary with `SITES_INSTA
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
 - [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+
