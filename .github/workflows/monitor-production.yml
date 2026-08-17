@@ -1,0 +1,27 @@
+name: Monitor Clarity IE production
+on:
+  schedule: [{ cron: "*/10 * * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write }
+concurrency: { group: clarity-ie-production-monitor, cancel-in-progress: true }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe production dependencies
+        id: health
+        shell: bash
+        run: status=$(curl -sS --max-time 20 -o health.json -w '%{http_code}' "${{ vars.PRODUCTION_SITE_URL }}/api/health" || true); if [[ "$status" == 200 ]] && jq -e '.status == "ok" and .checks.database and .checks.objectStorage' health.json; then echo healthy=true >> "$GITHUB_OUTPUT"; else echo healthy=false >> "$GITHUB_OUTPUT"; fi
+      - name: Open or resolve incident
+        uses: actions/github-script@v7
+        env: { HEALTHY: "${{ steps.health.outputs.healthy }}" }
+        with:
+          script: |
+            const title = "Production monitor: Clarity IE unhealthy";
+            const { data } = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100 });
+            const incident = data.find(issue => issue.title === title);
+            if (process.env.HEALTHY === "true") { if (incident) await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: incident.number, state: "closed", state_reason: "completed" }); return; }
+            const body = `Automated production assurance failed at ${new Date().toISOString()}. Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}. No customer data is included.`;
+            if (incident) await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: incident.number, body }); else await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+

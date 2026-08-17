@@ -16,12 +16,16 @@
     "security:audit": "npm audit --omit=dev",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
+    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
+    "migrations:check": "node scripts/check-migrations.mjs",
+    "cloudflare:config": "node scripts/render-cloudflare-config.mjs"
   },
   "dependencies": {
+    "@neondatabase/auth": "^0.5.0-beta",
     "drizzle-orm": "0.45.2",
     "lucide-react": "^0.468.0",
     "next": "16.3.1",
+    "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -29,6 +33,7 @@
     "@cloudflare/vite-plugin": "1.52.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/pg": "^8.21.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.5",

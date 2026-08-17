@@ -1,0 +1,7 @@
+{
+  "dev": { "worker": "clarity-ie-dev", "r2Bucket": "clarity-ie-dev-files" },
+  "test": { "worker": "clarity-ie-test", "r2Bucket": "clarity-ie-test-files" },
+  "preprod": { "worker": "clarity-ie-preprod", "r2Bucket": "clarity-ie-preprod-files" },
+  "production": { "worker": "clarity-ie-production", "r2Bucket": "clarity-ie-production-files" }
+}
+
