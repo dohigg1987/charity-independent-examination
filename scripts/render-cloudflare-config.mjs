@@ -14,6 +14,8 @@ if (!artifactDigest || !/^[a-f0-9]{64}$/.test(artifactDigest)) throw new Error("
 
 const environments = JSON.parse(await readFile(new URL("../deployment/environments.json", import.meta.url), "utf8"));
 const selected = environments[environment];
+const siteUrl = new URL(publicSiteUrl);
+if (siteUrl.pathname !== "/" || siteUrl.search || siteUrl.hash) throw new Error("PUBLIC_SITE_URL must not include a path, query or fragment.");
 const config = {
   $schema: "node_modules/wrangler/config-schema.json",
   name: selected.worker,
@@ -26,6 +28,7 @@ const config = {
   rules: [{ type: "ESModule", globs: ["**/*.js"] }],
   upload_source_maps: true,
   placement: { mode: "smart" },
+  routes: [{ pattern: siteUrl.hostname, custom_domain: true }],
   images: { binding: "IMAGES" },
   observability: { enabled: true, logs: { enabled: true, invocation_logs: true, head_sampling_rate: environment === "production" ? 0.25 : 1 } },
   version_metadata: { binding: "CF_VERSION_METADATA" },
