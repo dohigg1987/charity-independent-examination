@@ -71,11 +71,18 @@ jobs:
           echo "version_id=$previous" >> "$GITHUB_OUTPUT"
       - name: Upload immutable Worker version
         id: upload
-        env: { CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}", CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" }
+        env:
+          CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          PREVIOUS_VERSION: "${{ steps.previous.outputs.version_id }}"
         shell: bash
         run: |
-          output=$(npx wrangler versions upload --config "${{ steps.config.outputs.path }}" --secrets-file "${{ steps.secrets.outputs.path }}" --tag "${{ inputs.commit }}" --message "${{ inputs.target }} from ${{ inputs.commit }}")
-          version_id=$(printf '%s\n' "$output" | sed -nE 's/.*Worker Version ID: ([a-f0-9-]+).*/\1/p' | tail -1); test -n "$version_id"; echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            output=$(npx wrangler versions upload --config "${{ steps.config.outputs.path }}" --secrets-file "${{ steps.secrets.outputs.path }}" --tag "${{ inputs.commit }}" --message "${{ inputs.target }} from ${{ inputs.commit }}")
+          else
+            output=$(npx wrangler deploy --config "${{ steps.config.outputs.path }}" --secrets-file "${{ steps.secrets.outputs.path }}" --tag "${{ inputs.commit }}" --message "Bootstrap ${{ inputs.target }} from ${{ inputs.commit }}")
+          fi
+          version_id=$(printf '%s\n' "$output" | sed -nE 's/.*Version ID: ([a-f0-9-]+).*/\1/p' | tail -1); test -n "$version_id"; echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
       - name: Deploy, assure and automatically roll back on failure
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
