@@ -2,6 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Badge,
+  Button,
+  Dialog,
+  DialogSurface,
+  Field,
+  Input,
+  SearchBox,
+  Select,
+  Tab,
+  TabList,
+  Textarea,
+} from "@fluentui/react-components";
+import {
   Archive,
   ArrowLeft,
   CheckCircle2,
@@ -12,7 +25,6 @@ import {
   Paperclip,
   Plus,
   Reply,
-  Search,
   Send,
   ShieldCheck,
   X,
@@ -94,13 +106,12 @@ export function CommunicationsWorkspace({
             completion communications.
           </p>
         </div>
-        <button className="primary" onClick={() => setNewOpen(true)}>
+        <Button appearance="primary" className="primary" onClick={() => setNewOpen(true)}>
           <Plus /> New conversation
-        </button>
+        </Button>
       </header>
-      <label className="engagement-select communications-engagement">
-        Engagement
-        <select
+      <Field className="engagement-select communications-engagement" label="Engagement">
+        <Select
           value={engagementId}
           onChange={(event) => {
             selectEngagement(event.target.value);
@@ -112,31 +123,35 @@ export function CommunicationsWorkspace({
               {item.clientName} · {date(item.periodEnd)}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
       <div className={`communications-shell ${selected ? "has-selection" : ""}`}>
         <aside className="conversation-index">
           <div className="conversation-search">
-            <Search />
-            <input
+            <SearchBox
               aria-label="Search conversations"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(_, data) => setQuery(data.value)}
               placeholder="Search subject or message"
             />
           </div>
-          <div className="conversation-filters" aria-label="Conversation filters">
+          <TabList
+            className="conversation-filters"
+            aria-label="Conversation filters"
+            selectedValue={filter}
+            onTabSelect={(_, data) => setFilter(data.value as typeof filter)}
+          >
             {(["ALL", "UNREAD", "OPEN", "RESOLVED"] as const).map((item) => (
-              <button
+              <Tab
                 key={item}
+                value={item}
                 className={filter === item ? "active" : ""}
-                onClick={() => setFilter(item)}
               >
                 {label(item)}
-                {item === "UNREAD" && unread > 0 && <b>{unread}</b>}
-              </button>
+                {item === "UNREAD" && unread > 0 && <Badge appearance="filled" color="brand">{unread}</Badge>}
+              </Tab>
             ))}
-          </div>
+          </TabList>
           <div className="conversation-list">
             {threads.map((thread) => {
               const latest = lastMessage(state, thread.id);
@@ -166,7 +181,7 @@ export function CommunicationsWorkspace({
                           {label(thread.priority)}
                         </i>
                       )}
-                      {unreadThread && <b>New</b>}
+                      {unreadThread && <Badge appearance="filled" color="brand">New</Badge>}
                     </span>
                   </span>
                 </button>
@@ -397,9 +412,8 @@ function ConversationDetail({
               </div>
             </div>
           )}
-          <label>
-            Priority
-            <select
+          <Field label="Priority">
+            <Select
               value={thread.priority}
               onChange={(event) =>
                 void mutate("updateConversation", {
@@ -413,11 +427,10 @@ function ConversationDetail({
               <option value="NORMAL">Normal</option>
               <option value="HIGH">High</option>
               <option value="URGENT">Urgent</option>
-            </select>
-          </label>
-          <label>
-            Conversation owner
-            <select
+            </Select>
+          </Field>
+          <Field label="Conversation owner">
+            <Select
               value={thread.assignedTo ?? ""}
               onChange={(event) =>
                 void mutate("updateConversation", {
@@ -432,11 +445,11 @@ function ConversationDetail({
               {state.users.filter((user) => user.status === "ACTIVE").map((user) => (
                 <option value={user.email} key={user.id}>{user.name}</option>
               ))}
-            </select>
-          </label>
-          <label>
-            {thread.status === "RESOLVED" ? "Reason for reopening" : "Resolution summary"}
-            <textarea
+            </Select>
+          </Field>
+          <Field label={thread.status === "RESOLVED" ? "Reason for reopening" : "Resolution summary"}>
+            <Textarea
+              resize="vertical"
               value={resolutionNote}
               onChange={(event) => setResolutionNote(event.target.value)}
               placeholder={
@@ -445,15 +458,16 @@ function ConversationDetail({
                   : "Record the outcome before closing"
               }
             />
-          </label>
-          <button
+          </Field>
+          <Button
+            appearance="secondary"
             className="secondary conversation-resolution"
             disabled={busy || !resolutionNote.trim()}
             onClick={() => changeStatus(thread.status === "RESOLVED" ? "OPEN" : "RESOLVED")}
           >
             {thread.status === "RESOLVED" ? <Archive /> : <CheckCircle2 />}
             {thread.status === "RESOLVED" ? "Reopen conversation" : "Resolve conversation"}
-          </button>
+          </Button>
         </aside>
       </div>
       <footer className="message-composer">
@@ -477,7 +491,8 @@ function ConversationDetail({
                 <button onClick={() => setFile(null)} aria-label="Remove attachment"><X /></button>
               </div>
             )}
-            <textarea
+            <Textarea
+              resize="vertical"
               aria-label="Message"
               maxLength={10_000}
               value={message}
@@ -497,10 +512,10 @@ function ConversationDetail({
                 <Paperclip /> Attach evidence
               </label>
               <span>{message.length.toLocaleString()}/10,000 · Ctrl + Enter to send</span>
-              <button className="primary" disabled={busy || !message.trim()} onClick={() => void send()}>
+              <Button appearance="primary" className="primary" disabled={busy || !message.trim()} onClick={() => void send()}>
                 {busy ? <Loader2 className="spin" /> : <Send />}
                 {busy ? "Sending…" : "Send message"}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -527,11 +542,11 @@ function NewConversation({
   const engagement = state.engagements.find((item) => item.id === engagementId)!;
   const client = state.clients.find((item) => item.id === engagement.clientId)!;
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal communications-modal" role="dialog" aria-modal="true" aria-labelledby="new-conversation-title">
+    <Dialog open modalType="modal" onOpenChange={(_, data) => { if (!data.open) close(); }}>
+      <DialogSurface className="modal communications-modal" aria-labelledby="new-conversation-title">
         <header>
           <div><p className="eyebrow">CLIENT COLLABORATION</p><h2 id="new-conversation-title">New conversation</h2></div>
-          <button onClick={close} aria-label="Close"><X /></button>
+          <Button appearance="subtle" type="button" onClick={close} aria-label="Close new conversation"><X /></Button>
         </header>
         <form
           className="modal-form"
@@ -557,20 +572,20 @@ function NewConversation({
           </div>
           <input type="hidden" name="contactName" value={client.contactName} />
           <input type="hidden" name="contactEmail" value={client.contactEmail} />
-          <label>Subject<input name="subject" required maxLength={160} placeholder="Concise description of the matter" /></label>
+          <Field label="Subject" required><Input name="subject" required maxLength={160} placeholder="Concise description of the matter" /></Field>
           <div className="two-col">
-            <label>Category<select name="category" defaultValue="GENERAL"><option value="GENERAL">General</option><option value="EVIDENCE">Evidence</option><option value="GOVERNANCE">Governance</option><option value="REPORTING">Reporting</option><option value="TECHNICAL">Technical</option></select></label>
-            <label>Priority<select name="priority" defaultValue="NORMAL"><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option></select></label>
+            <Field label="Category"><Select name="category" defaultValue="GENERAL"><option value="GENERAL">General</option><option value="EVIDENCE">Evidence</option><option value="GOVERNANCE">Governance</option><option value="REPORTING">Reporting</option><option value="TECHNICAL">Technical</option></Select></Field>
+            <Field label="Priority"><Select name="priority" defaultValue="NORMAL"><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option></Select></Field>
           </div>
-          <label>Message<textarea name="message" required maxLength={10_000} placeholder="Set out the question, required action and relevant timing." /></label>
+          <Field label="Message" required><Textarea resize="vertical" name="message" required maxLength={10_000} placeholder="Set out the question, required action and relevant timing." /></Field>
           <footer>
             <span><ShieldCheck /> Sent through the secure client portal</span>
-            <button type="button" className="secondary" onClick={close}>Cancel</button>
-            <button className="primary" disabled={busy}>{busy ? <Loader2 className="spin" /> : <Send />} Send</button>
+            <Button appearance="secondary" type="button" className="secondary" onClick={close}>Cancel</Button>
+            <Button type="submit" appearance="primary" className="primary" disabled={busy}>{busy ? <Loader2 className="spin" /> : <Send />} Send</Button>
           </footer>
         </form>
-      </div>
-    </div>
+      </DialogSurface>
+    </Dialog>
   );
 }
 

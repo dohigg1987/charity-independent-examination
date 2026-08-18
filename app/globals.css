@@ -365,6 +365,71 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{border-radius:7px!i
 @media(max-width:760px){.sidebar{display:none}.sidebar.mobile-open{display:flex;z-index:80;width:min(290px,84vw);animation:mobile-nav-in .18s ease-out}.mobile-nav-backdrop{position:fixed;display:block;inset:0;z-index:70;border:0;background:rgba(14,28,35,.48);backdrop-filter:blur(2px)}.mobile-menu-button{display:grid;width:38px;height:38px;flex:0 0 auto;place-items:center;border:0;border-radius:8px;background:#edf5f5;color:var(--teal-dark)}.mobile-menu-button svg{width:19px}.topbar{gap:10px}.topbar .search{width:min(100%,420px)}.top-actions{margin-left:auto}.top-actions>button:first-child{display:none}.engagement-banner{height:auto;min-height:56px;padding-block:10px}.banner-actions{flex-wrap:wrap;justify-content:flex-end}}@keyframes mobile-nav-in{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 
+/* Fluent 2 application foundation -------------------------------------------------
+   The provider supplies the canonical --color*, --font* and --spacing* tokens.
+   These aliases let the existing workflow adopt them progressively while new
+   controls use Fluent UI React v9 directly. */
+:root{
+  --ink:var(--colorNeutralForeground1,#20333e);
+  --muted:var(--colorNeutralForeground3,#687a83);
+  --line:var(--colorNeutralStroke1,#d7e1e3);
+  --soft:var(--colorNeutralBackground2,#f7f9fa);
+  --teal:var(--colorBrandBackground,#007c7c);
+  --teal-dark:var(--colorBrandBackgroundHover,#006d6d);
+  --teal-soft:var(--colorBrandBackground2,#e2f6f5);
+  --font-primary:var(--fontFamilyBase,"Segoe UI Variable","Segoe UI",sans-serif);
+  --font-secondary:var(--fontFamilyBase,"Segoe UI Variable","Segoe UI",sans-serif);
+  --app-bg:var(--colorNeutralBackground2,#f7f9fa);
+  --surface:var(--colorNeutralBackground1,#fff);
+  --text:var(--colorNeutralForeground1,#20333e);
+  --text-muted:var(--colorNeutralForeground3,#687a83);
+  --border:var(--colorNeutralStroke1,#d7e1e3);
+  --radius-sm:var(--borderRadiusMedium,6px);
+  --radius-md:var(--borderRadiusLarge,8px);
+  --radius-lg:var(--borderRadiusXLarge,12px);
+  --shadow-xs:var(--shadow4,0 1px 2px rgba(15,37,46,.08));
+  --shadow-sm:var(--shadow8,0 2px 8px rgba(15,37,46,.1));
+  --shadow-md:var(--shadow16,0 8px 24px rgba(15,37,46,.12));
+}
+html,body,.clarity-fluent-provider{min-height:100%;margin:0;background:var(--colorNeutralBackground2,#f7f9fa);color:var(--colorNeutralForeground1,#20333e);font-family:var(--fontFamilyBase,"Segoe UI Variable","Segoe UI",sans-serif);text-rendering:optimizeLegibility}
+.clarity-fluent-provider{min-height:100dvh}
+button,input,select,textarea{font:inherit}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:2px solid var(--colorStrokeFocus2,#000);outline-offset:2px}
+::selection{background:var(--colorBrandBackground2,#e2f6f5);color:var(--colorNeutralForeground1,#20333e)}
+
+/* Fluent shell geometry: dense enough for professional casework, with labels
+   retained at every breakpoint and a proper off-canvas navigation on mobile. */
+.app-shell{grid-template-columns:272px minmax(0,1fr);background:var(--colorNeutralBackground2,#f7f9fa)}
+.sidebar{width:272px;padding:20px 12px 16px;background:#172a34;border-right:1px solid rgba(255,255,255,.08);box-shadow:none}
+.sidebar nav{margin-top:16px}
+.nav-label{margin:18px 10px 6px;color:#a8bac2;font-size:11px;font-weight:600;letter-spacing:.08em}
+.nav-label.lower{margin-top:22px}
+.sidebar nav button{min-height:40px;margin:1px 0;padding:0 10px;border-radius:var(--borderRadiusMedium,6px);gap:12px;color:#e1e9ec;font-size:14px;font-weight:500;transition:background var(--durationFaster,100ms) var(--curveEasyEase,ease),color var(--durationFaster,100ms) var(--curveEasyEase,ease)}
+.sidebar nav button:hover{background:rgba(255,255,255,.09);color:#fff;transform:none}
+.sidebar nav button.active{background:#dff4f2;color:#084d4d;box-shadow:none}
+.sidebar nav button.active:before{display:none}
+.sidebar nav button svg{width:20px;height:20px}
+.sidebar nav button b{min-width:20px;padding:2px 6px;border-radius:10px;background:#c94f2d;color:#fff;font-size:11px;line-height:16px}
+.organisation-switch{min-height:56px;padding:8px;border:1px solid rgba(255,255,255,.16);border-radius:var(--borderRadiusLarge,8px);background:rgba(255,255,255,.06);color:#fff}
+.organisation-switch:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.1)}
+.organisation-switch small,.user-card small{color:#afc0c7;font-size:12px}
+.sidebar-foot{padding:10px;border-color:rgba(103,210,204,.22);border-radius:var(--borderRadiusLarge,8px);background:rgba(0,124,124,.16)}
+.sidebar-foot strong{font-size:12px}.sidebar-foot small{color:#afc0c7;font-size:11px;line-height:1.35}
+.user-card{min-height:56px;padding:12px 6px 0}.user-card strong{font-size:13px}.user-card>svg{width:20px}
+.main{grid-column:2}
+.topbar{height:64px;padding:0 24px;border-bottom:1px solid var(--colorNeutralStroke2,#e5ebec);background:rgba(255,255,255,.96);box-shadow:none;backdrop-filter:blur(16px)}
+.topbar .search{min-height:40px;width:min(560px,50vw);padding:0 12px;border:1px solid var(--colorNeutralStroke1,#d7e1e3);border-radius:var(--borderRadiusMedium,6px);background:var(--colorNeutralBackground1,#fff);color:var(--colorNeutralForeground3,#687a83)}
+.topbar .search:focus-within{border-color:var(--colorBrandStroke1,#007c7c);box-shadow:0 0 0 1px var(--colorBrandStroke1,#007c7c)}
+.topbar .search input{font-size:14px}.topbar .search kbd{border:0;background:var(--colorNeutralBackground3,#f1f4f5);font-size:11px}
+.top-actions>button{display:grid;min-width:40px;min-height:40px;place-items:center;border-radius:var(--borderRadiusMedium,6px);color:var(--colorNeutralForeground2,#4b5f6a)}
+.top-actions>button:hover{background:var(--colorNeutralBackground3,#f1f4f5)}
+.portal-link{min-height:40px;padding:0 12px;border-color:var(--colorNeutralStroke1,#d7e1e3);border-radius:var(--borderRadiusMedium,6px);background:var(--colorNeutralBackground1,#fff);color:var(--colorBrandForeground1,#006d6d);font-size:13px;font-weight:600}
+.breadcrumbs{top:64px;min-height:40px;padding:0 24px;background:rgba(247,249,250,.96)}
+.page{padding:32px 32px 64px}
+
+@media(max-width:1100px){.app-shell{grid-template-columns:248px minmax(0,1fr)}.sidebar{width:248px}.page{padding-inline:24px}}
+@media(max-width:760px){.app-shell{display:block}.main{grid-column:auto}.sidebar.mobile-open{display:flex;position:fixed;inset:0 auto 0 0;width:min(320px,88vw);padding:18px 12px;box-shadow:var(--shadow28,0 14px 40px rgba(15,37,46,.2))}.topbar{height:56px;padding:0 12px}.topbar .search{width:min(100%,460px);min-height:38px}.topbar .search kbd{display:none}.breadcrumbs{top:56px;padding-inline:16px}.mobile-menu-button{width:40px;height:40px;border-radius:var(--borderRadiusMedium,6px);background:var(--colorNeutralBackground3,#f1f4f5);color:var(--colorBrandForeground1,#006d6d)}.page{padding:24px 16px 48px}}
+
 /* Client relationship workspace */
 .client-file-tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:7px;border:1px solid var(--border);border-radius:var(--radius-md);background:#eaf0f1;box-shadow:inset 0 1px 2px rgba(30,55,65,.04)}
 .client-file-tabs button{min-height:62px;padding:10px 12px;border-radius:8px;color:#566b76;transition:background .15s,border-color .15s,box-shadow .15s}.client-file-tabs button:hover{background:rgba(255,255,255,.66)}.client-file-tabs button.active{border-color:#9ac5c4;border-left:3px solid var(--accent);border-radius:8px;background:#fff;box-shadow:var(--shadow-xs)}.client-file-tabs svg{color:var(--teal)}.client-file-tabs strong{font-size:11px}.client-file-tabs small{color:#7d8c93;font-size:9px}

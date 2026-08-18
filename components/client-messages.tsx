@@ -2,11 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Select,
+  Spinner,
+  Textarea,
+} from "@fluentui/react-components";
+import {
   ArrowLeft,
   CheckCircle2,
   FileText,
   Inbox,
-  Loader2,
   MessageSquare,
   Paperclip,
   Plus,
@@ -79,14 +94,14 @@ export function ClientMessages({
           <p>Discuss requests and engagement matters directly with the examination team.</p>
         </div>
         {canRespond ? (
-          <button className="primary" onClick={() => setNewOpen(true)}><Plus /> New conversation</button>
+          <Button appearance="primary" icon={<Plus />} onClick={() => setNewOpen(true)}>New conversation</Button>
         ) : (
           <span className="client-read-only-badge"><ShieldCheck /> Read only</span>
         )}
       </header>
       <div className={`communications-shell client-communications ${selected ? "has-selection" : ""}`}>
         <aside className="conversation-index">
-          <div className="conversation-search"><Search /><input aria-label="Search messages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search messages" /></div>
+          <div className="conversation-search"><Input aria-label="Search messages" value={query} onChange={(_, data) => setQuery(data.value)} placeholder="Search messages" contentBefore={<Search />} /></div>
           <div className="client-inbox-heading"><span><Inbox /> Inbox</span><b>{threads.filter((thread) => unread(state, thread)).length} unread</b></div>
           <div className="conversation-list">
             {threads.map((thread) => {
@@ -224,7 +239,7 @@ function ClientThread({
         <div ref={endRef} />
       </div>
       <footer className="message-composer client-composer">
-        {error && <div className="composer-error">{error}</div>}
+        {error && <MessageBar className="composer-error" intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
         {thread.status === "RESOLVED" ? (
           <div className="resolved-banner"><CheckCircle2 /> This conversation has been resolved by the examination team.</div>
         ) : !canRespond ? (
@@ -233,8 +248,8 @@ function ClientThread({
           <>
             {replyTo && <div className="replying-to"><Reply /><span><strong>Replying to {replyTo.authorName}</strong>{replyTo.body}</span><button onClick={() => setReplyTo(null)} aria-label="Cancel reply"><X /></button></div>}
             {file && <div className="pending-attachment"><Paperclip /><span>{file.name}</span><button onClick={() => setFile(null)} aria-label="Remove attachment"><X /></button></div>}
-            <textarea aria-label="Message" value={message} maxLength={10_000} onChange={(event) => setMessage(event.target.value)} placeholder="Write a message to the examination team…" onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") void send(); }} />
-            <div><label className="attach-button"><input type="file" accept=".pdf,.docx,.xlsx,.csv,.jpg,.jpeg,.png" onChange={(event) => { const selected = event.target.files?.[0] ?? null; if (selected && selected.size > 25 * 1024 * 1024) { setError("The selected file exceeds the 25 MB limit"); setFile(null); event.target.value = ""; return; } setError(""); setFile(selected); }} /><Paperclip /> Attach file</label><span>{message.length.toLocaleString()}/10,000</span><button className="primary" disabled={busy || !message.trim()} onClick={() => void send()}>{busy ? <Loader2 className="spin" /> : <Send />}{busy ? "Sending…" : "Send"}</button></div>
+            <Textarea aria-label="Message" value={message} maxLength={10_000} onChange={(_, data) => setMessage(data.value)} placeholder="Write a message to the examination team…" resize="vertical" onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") void send(); }} />
+            <div><label className="attach-button"><input type="file" accept=".pdf,.docx,.xlsx,.csv,.jpg,.jpeg,.png" onChange={(event) => { const selected = event.target.files?.[0] ?? null; if (selected && selected.size > 25 * 1024 * 1024) { setError("The selected file exceeds the 25 MB limit"); setFile(null); event.target.value = ""; return; } setError(""); setFile(selected); }} /><Paperclip /> Attach file</label><span>{message.length.toLocaleString()}/10,000</span><Button appearance="primary" disabled={busy || !message.trim()} icon={busy ? <Spinner size="tiny" /> : <Send />} onClick={() => void send()}>{busy ? "Sending…" : "Send"}</Button></div>
           </>
         )}
       </footer>
@@ -270,22 +285,12 @@ function NewClientConversation({
       participant.participantType === "PRACTICE",
   );
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div
-        className="modal communications-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="client-new-message"
-      >
-        <header>
-          <div>
+    <Dialog open modalType="modal" onOpenChange={(_, data) => { if (!data.open) close(); }}>
+      <DialogSurface className="modal communications-modal" aria-labelledby="client-new-message">
+        <DialogBody>
+          <DialogTitle id="client-new-message" action={<Button type="button" appearance="subtle" icon={<X />} onClick={close} aria-label="Close" />}>Contact the examination team</DialogTitle>
+          <DialogContent>
             <p className="eyebrow">SECURE MESSAGE</p>
-            <h2 id="client-new-message">Contact the examination team</h2>
-          </div>
-          <button type="button" onClick={close} aria-label="Close">
-            <X />
-          </button>
-        </header>
         <form
           className="modal-form"
           onSubmit={(event) => {
@@ -326,9 +331,7 @@ function NewClientConversation({
           }}
         >
           {error && (
-            <div className="error-banner" role="alert">
-              {error}
-            </div>
+            <MessageBar className="error-banner" intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>
           )}
           <div className="recipient-card">
             <span className="conversation-avatar">
@@ -341,48 +344,48 @@ function NewClientConversation({
             </span>
             <ShieldCheck />
           </div>
-          <label>
-            Subject
-            <input
+          <Field label="Subject" required>
+            <Input
               name="subject"
               required
               maxLength={160}
               placeholder="What would you like to discuss?"
             />
-          </label>
-          <label>
-            Category
-            <select name="category" defaultValue="GENERAL">
+          </Field>
+          <Field label="Category">
+            <Select name="category" defaultValue="GENERAL">
               <option value="GENERAL">General engagement question</option>
               <option value="EVIDENCE">Evidence or information request</option>
               <option value="GOVERNANCE">Trustees or governance</option>
               <option value="REPORTING">Accounts or reporting</option>
               <option value="TECHNICAL">Portal support</option>
-            </select>
-          </label>
-          <label>
-            Message
-            <textarea
+            </Select>
+          </Field>
+          <Field label="Message" required>
+            <Textarea
               name="message"
               required
               maxLength={10_000}
               placeholder="Provide enough context for the team to respond."
+              resize="vertical"
             />
-          </label>
-          <footer>
+          </Field>
+          <DialogActions className="communications-dialog-actions">
             <span>
               <ShieldCheck /> Secure and recorded
             </span>
-            <button type="button" className="secondary" onClick={close}>
+            <Button type="button" appearance="secondary" onClick={close}>
               Cancel
-            </button>
-            <button className="primary" disabled={busy}>
-              {busy ? <Loader2 className="spin" /> : <Send />} Send
-            </button>
-          </footer>
+            </Button>
+            <Button type="submit" appearance="primary" disabled={busy} icon={busy ? <Spinner size="tiny" /> : <Send />}>
+              Send
+            </Button>
+          </DialogActions>
         </form>
-      </div>
-    </div>
+          </DialogContent>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
   );
 }
 

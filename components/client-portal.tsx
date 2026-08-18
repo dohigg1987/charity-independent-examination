@@ -4,6 +4,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Button,
+  MessageBar,
+  MessageBarBody,
+  Select,
+  Spinner,
+  Tab,
+  TabList,
+  Textarea,
+} from "@fluentui/react-components";
+import {
   ArrowLeft,
   CheckCircle2,
   Clock3,
@@ -154,7 +164,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
     return (
       <div className="loading-screen">
         <Logo />
-        {loading ? <Loader2 className="spin" /> : null}
+        {loading ? <Spinner size="medium" label="Opening secure portal" /> : null}
         <p>
           {error ||
             (state
@@ -162,7 +172,9 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
               : "Opening the secure client portal…")}
         </p>
         {!loading && (
-          <button
+          <Button
+            appearance="secondary"
+            icon={<RefreshCw />}
             className="secondary"
             onClick={() => {
               setLoading(true);
@@ -176,8 +188,8 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
               });
             }}
           >
-            <RefreshCw /> Retry
-          </button>
+            Retry
+          </Button>
         )}
       </div>
     );
@@ -260,7 +272,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
           {state.engagements.length > 1 && (
             <label className="portal-engagement-switcher">
               <span>Annual file</span>
-              <select
+              <Select
                 aria-label="Select annual engagement"
                 value={engagement.id}
                 onChange={(event) => selectEngagement(event.target.value)}
@@ -270,13 +282,13 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
                     {item.clientName} · {fmt(item.periodEnd)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
-          <nav className="portal-nav" aria-label="Client portal">
-            <button type="button" className={portalView === "overview" ? "active" : ""} onClick={() => setPortalView("overview")}>Overview</button>
-            <button type="button" className={portalView === "messages" ? "active" : ""} onClick={() => setPortalView("messages")}>Messages{unreadMessages > 0 && <b>{unreadMessages}</b>}</button>
-          </nav>
+          <TabList className="portal-nav" aria-label="Client portal" selectedValue={portalView} onTabSelect={(_, data) => setPortalView(data.value as "overview" | "messages")}>
+            <Tab value="overview">Overview</Tab>
+            <Tab value="messages">Messages{unreadMessages > 0 && <b>{unreadMessages}</b>}</Tab>
+          </TabList>
           <span className="secure">
             <LockKeyhole />
             Secure client portal
@@ -313,12 +325,10 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
       </header>
       <main className="portal-main">
         {error && (
-          <div className="error-banner" role="alert">
-            {error}
-            <button onClick={() => setError("")} aria-label="Dismiss error">
-              <X />
-            </button>
-          </div>
+          <MessageBar intent="error" className="error-banner">
+            <MessageBarBody>{error}</MessageBarBody>
+            <Button appearance="transparent" size="small" icon={<X />} onClick={() => setError("")} aria-label="Dismiss error" />
+          </MessageBar>
         )}
         {success && (
           <div className="portal-success" role="status">
@@ -503,7 +513,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
                                 PDF, DOCX, XLSX, CSV, JPG or PNG · Maximum 25 MB
                               </small>
                             </label>
-                            <textarea
+                            <Textarea
                               aria-label={`Response to ${request.reference}`}
                               value={draft.note}
                               maxLength={10_000}
@@ -513,6 +523,7 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
                                 })
                               }
                               placeholder="Add a reply for your examiner (optional)"
+                              resize="vertical"
                             />
                             <div className="portal-response-meta">
                               <span>{draft.note.length.toLocaleString()}/10,000</span>

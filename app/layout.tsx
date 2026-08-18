@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ClarityFluentProvider } from "@/components/fluent/clarity-fluent-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: "light",
-  themeColor: "#2C3E50",
+  themeColor: "#007C7C",
 };
 
 export default function RootLayout({
@@ -47,7 +48,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ClarityFluentProvider>{children}</ClarityFluentProvider>
+      </body>
     </html>
   );
 }
