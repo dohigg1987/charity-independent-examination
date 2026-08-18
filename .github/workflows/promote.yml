@@ -31,7 +31,7 @@ jobs:
           case "$TARGET_ENV" in dev) prerequisite="" ;; test) prerequisite=dev ;; preprod) prerequisite=test ;; production) prerequisite=preprod ;; *) exit 1 ;; esac
           if [[ "$TARGET_ENV" == production ]]; then git fetch origin main; git merge-base --is-ancestor "$COMMIT_SHA" origin/main; fi
           if [[ -n "$prerequisite" ]]; then tag="deployed-${prerequisite}-${COMMIT_SHA}"; git fetch origin "refs/tags/${tag}:refs/tags/${tag}"; test "$(git rev-list -n 1 "$tag")" = "$COMMIT_SHA"; fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22.13.0, cache: npm }
       - run: npm ci
       - name: Download immutable CI artifact
