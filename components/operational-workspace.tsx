@@ -9,6 +9,8 @@ import {
   Checkbox,
   Dialog,
   DialogActions,
+  DialogBody,
+  DialogContent,
   DialogSurface,
   DialogTitle,
   Field as FluentField,
@@ -3944,46 +3946,20 @@ function DialogView({
     .filter((item) => item.status === "ACTIVE")
     .map((item) => item.name);
   const thread = state.comments.filter((c) => c.requestId === req?.id);
+  if (dialog.kind === "client" || dialog.kind === "editClient") {
+    return (
+      <ClientRecordDialog
+        dialog={{ kind: dialog.kind, data: dialog.data }}
+        client={client}
+        organisationTypes={organisationTypes}
+        close={close}
+        submit={submit}
+      />
+    );
+  }
   return (
     <Modal title={dialogTitle(dialog.kind)} close={close}>
       <form className="modal-form" onSubmit={submit}>
-        {(dialog.kind === "client" || dialog.kind === "editClient") && (
-          <>
-            <Field n="name" l="Charity name" v={client?.name} required />
-            <Field
-              n="charityNumber"
-              l="Charity number"
-              v={client?.charityNumber}
-              required
-            />
-            <Select
-              n="legalForm"
-              l="Organisation type"
-              v={client?.legalForm ?? organisationTypes[0]}
-              o={organisationTypes}
-            />
-            <Field
-              n="contactName"
-              l="Primary contact"
-              v={client?.contactName}
-              required
-            />
-            <Field
-              n="contactEmail"
-              l="Contact email (optional)"
-              type="email"
-              v={client?.contactEmail}
-            />
-            {dialog.kind === "editClient" && (
-              <Select
-                n="status"
-                l="Status"
-                v={client?.status}
-                o={["ACTIVE", "INACTIVE"]}
-              />
-            )}
-          </>
-        )}
         {(dialog.kind === "engagement" || dialog.kind === "editEngagement") && (
           <>
             <FluentField label="Client">
@@ -4229,15 +4205,106 @@ function DialogView({
           </Button>
           <Button appearance="primary" className="primary" type="submit">
             <Check />
-            {dialog.kind === "client"
-              ? "Create client"
-              : dialog.kind === "editClient"
-                ? "Save changes"
-                : "Save record"}
+            Save record
           </Button>
         </DialogActions>
       </form>
     </Modal>
+  );
+}
+
+function ClientRecordDialog({
+  dialog,
+  client,
+  organisationTypes,
+  close,
+  submit,
+}: {
+  dialog: { kind: "client" | "editClient"; data?: unknown };
+  client?: Client;
+  organisationTypes: string[];
+  close: () => void;
+  submit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
+}) {
+  const editing = dialog.kind === "editClient";
+  const title = editing ? "Edit client" : "New client";
+  return (
+    <Dialog
+      open
+      modalType="modal"
+      onOpenChange={(_, data) => {
+        if (!data.open) close();
+      }}
+    >
+      <DialogSurface className="client-dialog-surface" aria-label={title}>
+        <form className="client-dialog-form" onSubmit={submit}>
+          <DialogBody>
+            <DialogTitle
+              action={
+                <Button
+                  appearance="subtle"
+                  type="button"
+                  aria-label={`Close ${title}`}
+                  onClick={close}
+                >
+                  <X />
+                </Button>
+              }
+            >
+              {title}
+            </DialogTitle>
+            <DialogContent className="client-dialog-content">
+              <p className="client-dialog-intro">
+                Create the charity record now. Contact details can be added later.
+              </p>
+              <div className="client-dialog-grid">
+                <Field n="name" l="Charity name" v={client?.name} required />
+                <Field
+                  n="charityNumber"
+                  l="Charity number"
+                  v={client?.charityNumber}
+                  required
+                />
+                <Select
+                  className="client-dialog-wide"
+                  n="legalForm"
+                  l="Organisation type"
+                  v={client?.legalForm ?? organisationTypes[0]}
+                  o={organisationTypes}
+                />
+                <Field
+                  n="contactName"
+                  l="Primary contact (optional)"
+                  v={client?.contactName}
+                />
+                <Field
+                  n="contactEmail"
+                  l="Contact email (optional)"
+                  type="email"
+                  v={client?.contactEmail}
+                />
+                {editing && (
+                  <Select
+                    n="status"
+                    l="Status"
+                    v={client?.status}
+                    o={["ACTIVE", "INACTIVE"]}
+                  />
+                )}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" type="button" onClick={close}>
+                Cancel
+              </Button>
+              <Button appearance="primary" type="submit">
+                {editing ? "Save changes" : "Create client"}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </form>
+      </DialogSurface>
+    </Dialog>
   );
 }
 
@@ -4492,15 +4559,17 @@ function Field({
   type = "text",
   required = false,
   v,
+  className,
 }: {
   n: string;
   l: string;
   type?: "number" | "search" | "text" | "email" | "url" | "date" | "time" | "password" | "month" | "datetime-local" | "tel" | "week";
   required?: boolean;
   v?: string;
+  className?: string;
 }) {
   return (
-    <FluentField label={l} required={required}>
+    <FluentField className={className} label={l} required={required}>
       <FluentInput name={n} type={type} required={required} defaultValue={v} />
     </FluentField>
   );
@@ -4535,14 +4604,16 @@ function Select({
   l,
   o,
   v,
+  className,
 }: {
   n: string;
   l: string;
   o: string[];
   v?: string;
+  className?: string;
 }) {
   return (
-    <FluentField label={l}>
+    <FluentField className={className} label={l}>
       <FluentSelect name={n} defaultValue={v}>
         {o.map((x) => (
           <option value={x} key={x}>
