@@ -15,6 +15,7 @@ import {
   Circle,
   ClipboardCheck,
   Clock3,
+  CalendarClock,
   Download,
   FileCheck2,
   FileText,
@@ -27,8 +28,10 @@ import {
   Menu,
   MoreHorizontal,
   MessageSquare,
+  Mail,
   Paperclip,
   Plus,
+  Phone,
   Search,
   Save,
   RotateCcw,
@@ -48,6 +51,8 @@ import { ruleSeriesIssues } from "@/lib/rule-series";
 import type {
   AppState,
   Client,
+  ClientActivity,
+  ClientContact,
   Engagement,
   EvidenceRequest,
   Jurisdiction,
@@ -74,7 +79,13 @@ type View =
   | "templates"
   | "audit"
   | "admin";
-type ClientSection = "permanent" | "annual" | "governance";
+type ClientSection =
+  | "overview"
+  | "contacts"
+  | "activity"
+  | "permanent"
+  | "annual"
+  | "governance";
 type Dialog = {
   kind:
     | "client"
@@ -121,7 +132,7 @@ export function OperationalWorkspace() {
     [engagementId, setEngagementId] = useState<PublicId | null>(null),
     [taskId, setTaskId] = useState<PublicId | null>(null),
     [clientId, setClientId] = useState<PublicId | null>(null),
-    [clientSection, setClientSection] = useState<ClientSection>("permanent"),
+    [clientSection, setClientSection] = useState<ClientSection>("overview"),
     [query, setQuery] = useState(""),
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
@@ -206,7 +217,7 @@ export function OperationalWorkspace() {
     setView("engagement");
     setQuery("");
   };
-  const goClient = (id: PublicId, section: ClientSection = "permanent") => {
+  const goClient = (id: PublicId, section: ClientSection = "overview") => {
     setClientId(id);
     setClientSection(section);
     setView("clients");
@@ -439,10 +450,10 @@ export function OperationalWorkspace() {
           goClients={() =>
             goClient(
               activeClient.id,
-              view === "clients" ? clientSection : "permanent",
+              view === "clients" ? clientSection : "overview",
             )
           }
-          goClient={() => goClient(activeClient.id, "permanent")}
+          goClient={() => goClient(activeClient.id, "overview")}
           goEngagement={() => go(active.id)}
         />
         {error && (
@@ -528,7 +539,7 @@ export function OperationalWorkspace() {
             section={clientSection}
             selectClient={(id) => {
               setClientId(id);
-              setClientSection("permanent");
+              setClientSection("overview");
             }}
             selectSection={setClientSection}
             create={() => setDialog({ kind: "client" })}
@@ -663,11 +674,11 @@ function FirstRunWorkspace({
     state.clients[0]?.id ?? null,
   );
   const [clientSection, setClientSection] =
-    useState<ClientSection>("permanent");
+    useState<ClientSection>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const openClient = (id: PublicId) => {
     setSelectedClientId(id);
-    setClientSection("permanent");
+    setClientSection("overview");
     setView("clients");
   };
   return (
@@ -2635,6 +2646,20 @@ function Clients({
 }) {
   const client =
     state.clients.find((c) => c.id === selectedId) ?? state.clients[0];
+  const contacts = client
+    ? state.clientContacts
+        .filter((contact) => contact.clientId === client.id)
+        .sort(
+          (a, b) =>
+            Number(b.isPrimary) - Number(a.isPrimary) ||
+            a.name.localeCompare(b.name),
+        )
+    : [];
+  const activities = client
+    ? state.clientActivities
+        .filter((activity) => activity.clientId === client.id)
+        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+    : [];
   const annualFiles = client
     ? state.engagements
         .filter((e) => e.clientId === client.id)
@@ -2736,6 +2761,39 @@ function Clients({
               aria-label="Client record sections"
             >
               <button
+                className={section === "overview" ? "active" : ""}
+                aria-current={section === "overview" ? "page" : undefined}
+                onClick={() => selectSection("overview")}
+              >
+                <LayoutDashboard />
+                <span>
+                  <strong>Overview</strong>
+                  <small>Relationship at a glance</small>
+                </span>
+              </button>
+              <button
+                className={section === "contacts" ? "active" : ""}
+                aria-current={section === "contacts" ? "page" : undefined}
+                onClick={() => selectSection("contacts")}
+              >
+                <Users />
+                <span>
+                  <strong>Contacts</strong>
+                  <small>{contacts.filter((item) => item.status === "ACTIVE").length} active</small>
+                </span>
+              </button>
+              <button
+                className={section === "activity" ? "active" : ""}
+                aria-current={section === "activity" ? "page" : undefined}
+                onClick={() => selectSection("activity")}
+              >
+                <Activity />
+                <span>
+                  <strong>Activity</strong>
+                  <small>{activities.filter((item) => item.followUpDate && !item.completedAt).length} follow-up(s)</small>
+                </span>
+              </button>
+              <button
                 className={section === "permanent" ? "active" : ""}
                 aria-current={section === "permanent" ? "page" : undefined}
                 onClick={() => selectSection("permanent")}
@@ -2774,6 +2832,35 @@ function Clients({
                 </span>
               </button>
             </nav>
+            {section === "overview" && (
+              <ClientOverview
+                client={client}
+                contacts={contacts}
+                activities={activities}
+                annualFiles={annualFiles}
+                permanentCount={permanentCount}
+                openAnnual={openAnnual}
+                selectSection={selectSection}
+              />
+            )}
+            {section === "contacts" && (
+              <ClientContacts
+                client={client}
+                contacts={contacts}
+                mutate={mutate}
+                notify={notify}
+              />
+            )}
+            {section === "activity" && (
+              <ClientActivity
+                client={client}
+                contacts={contacts}
+                activities={activities}
+                annualFiles={annualFiles}
+                mutate={mutate}
+                notify={notify}
+              />
+            )}
             {section === "permanent" && (
               <PermanentFile
                 state={state}
@@ -2935,6 +3022,233 @@ function Clients({
         )}
       </div>
     </Page>
+  );
+}
+
+function ClientOverview({
+  client,
+  contacts,
+  activities,
+  annualFiles,
+  permanentCount,
+  openAnnual,
+  selectSection,
+}: {
+  client: Client;
+  contacts: ClientContact[];
+  activities: ClientActivity[];
+  annualFiles: Engagement[];
+  permanentCount: number;
+  openAnnual: (id: PublicId) => void;
+  selectSection: (section: ClientSection) => void;
+}) {
+  const primary = contacts.find((contact) => contact.isPrimary) ?? contacts[0];
+  const followUps = activities
+    .filter((item) => item.followUpDate && !item.completedAt)
+    .sort((a, b) => a.followUpDate!.localeCompare(b.followUpDate!));
+  const latestAnnual = annualFiles[0];
+  return (
+    <div className="client-overview-grid">
+      <section className="panel crm-summary-card">
+        <header><span className="crm-icon"><Users /></span><div><p>RELATIONSHIP</p><h2>Key contact</h2></div></header>
+        {primary ? (
+          <div className="crm-key-contact">
+            <span className="avatar">{initials(primary.name)}</span>
+            <span><strong>{primary.name}</strong><small>{primary.role || "Client contact"}</small></span>
+            <div>
+              {primary.email && <a href={`mailto:${primary.email}`}><Mail />{primary.email}</a>}
+              {primary.phone && <a href={`tel:${primary.phone}`}><Phone />{primary.phone}</a>}
+            </div>
+          </div>
+        ) : (
+          <p className="crm-empty-copy">Add the first relationship contact for {client.name}.</p>
+        )}
+        <button className="secondary crm-card-action" onClick={() => selectSection("contacts")}>Manage contacts <ChevronRight /></button>
+      </section>
+      <section className="panel crm-summary-card">
+        <header><span className="crm-icon"><FolderOpen /></span><div><p>ENGAGEMENT</p><h2>Latest annual file</h2></div></header>
+        {latestAnnual ? (
+          <div className="crm-file-summary">
+            <strong>Year ended {fmtDate(latestAnnual.periodEnd)}</strong>
+            <span><Status s={latestAnnual.status} /></span>
+            <small>{latestAnnual.accountingBasis}</small>
+          </div>
+        ) : <p className="crm-empty-copy">No annual working-paper file has been opened yet.</p>}
+        <button className="secondary crm-card-action" onClick={() => latestAnnual ? openAnnual(latestAnnual.id) : selectSection("annual")}>
+          {latestAnnual ? "Open annual file" : "View annual files"} <ChevronRight />
+        </button>
+      </section>
+      <section className="panel crm-summary-card crm-followup-card">
+        <header><span className="crm-icon"><CalendarClock /></span><div><p>NEXT ACTION</p><h2>Follow-ups</h2></div><b>{followUps.length}</b></header>
+        {followUps.slice(0, 3).map((item) => (
+          <div className="crm-followup-preview" key={item.id}>
+            <span className="crm-date-tile"><strong>{new Date(`${item.followUpDate}T00:00:00`).getDate()}</strong><small>{new Date(`${item.followUpDate}T00:00:00`).toLocaleDateString("en-GB", { month: "short" })}</small></span>
+            <span><strong>{item.nextAction || item.subject}</strong><small>{item.subject}</small></span>
+          </div>
+        ))}
+        {!followUps.length && <p className="crm-empty-copy">Nothing is waiting for follow-up.</p>}
+        <button className="secondary crm-card-action" onClick={() => selectSection("activity")}>Open activity <ChevronRight /></button>
+      </section>
+      <section className="panel client-record-strip" aria-label="Client record summary">
+        <span><small>Contacts</small><strong>{contacts.filter((item) => item.status === "ACTIVE").length}</strong></span>
+        <span><small>Recorded activities</small><strong>{activities.length}</strong></span>
+        <span><small>Annual files</small><strong>{annualFiles.length}</strong></span>
+        <span><small>Permanent documents</small><strong>{permanentCount}</strong></span>
+      </section>
+    </div>
+  );
+}
+
+function ClientContacts({
+  client,
+  contacts,
+  mutate,
+  notify,
+}: {
+  client: Client;
+  contacts: ClientContact[];
+  mutate: Mutate;
+  notify: Notify;
+}) {
+  const [adding, setAdding] = useState(false);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form).entries());
+    await mutate("createClientContact", {
+      ...values,
+      clientId: client.id,
+      isPrimary: values.isPrimary === "on",
+    });
+    form.reset();
+    setAdding(false);
+    notify("Client contact added");
+  };
+  return (
+    <section className="panel crm-panel">
+      <div className="panel-title crm-panel-title">
+        <div><h2>Relationship contacts</h2><p>People the practice works with across engagements</p></div>
+        <button onClick={() => setAdding((open) => !open)} aria-expanded={adding}><Plus />Add contact</button>
+      </div>
+      {adding && (
+        <form className="crm-quick-form" onSubmit={submit}>
+          <div className="crm-form-heading"><div><strong>New contact</strong><small>Record only the details needed to manage the relationship.</small></div><button type="button" className="icon-button" aria-label="Close new contact form" onClick={() => setAdding(false)}><X /></button></div>
+          <div className="crm-form-grid">
+            <Field n="name" l="Full name" required />
+            <Field n="role" l="Role or responsibility" />
+            <Field n="email" l="Email (optional)" type="email" />
+            <Field n="phone" l="Phone (optional)" type="tel" />
+          </div>
+          <label className="crm-check"><input type="checkbox" name="isPrimary" /> Primary relationship contact</label>
+          <footer><button type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</button><button className="primary" type="submit"><Save />Save contact</button></footer>
+        </form>
+      )}
+      <div className="crm-contact-list">
+        {contacts.map((contact) => (
+          <article className={`crm-contact-row ${contact.status !== "ACTIVE" ? "inactive" : ""}`} key={contact.id}>
+            <span className="avatar">{initials(contact.name)}</span>
+            <div><strong>{contact.name}{contact.isPrimary && <em>Primary</em>}</strong><small>{contact.role || "Client contact"}</small></div>
+            <div className="crm-contact-links">
+              {contact.email ? <a href={`mailto:${contact.email}`}><Mail />{contact.email}</a> : <span>Email not recorded</span>}
+              {contact.phone ? <a href={`tel:${contact.phone}`}><Phone />{contact.phone}</a> : <span>Phone not recorded</span>}
+            </div>
+            <div className="crm-row-actions">
+              {!contact.isPrimary && contact.status === "ACTIVE" && <button className="secondary" onClick={() => handleUiAction(async () => { await mutate("updateClientContact", { contactId: contact.id, isPrimary: true }); notify("Primary contact updated"); })}>Make primary</button>}
+              {(contact.status !== "ACTIVE" || !contact.isPrimary) && (
+                <button className="secondary" onClick={() => handleUiAction(async () => { await mutate("updateClientContact", { contactId: contact.id, status: contact.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" }); notify(`Contact ${contact.status === "ACTIVE" ? "archived" : "restored"}`); })}>{contact.status === "ACTIVE" ? "Archive" : "Restore"}</button>
+              )}
+            </div>
+          </article>
+        ))}
+        {!contacts.length && <div className="crm-empty-state"><Users /><strong>No relationship contacts yet</strong><p>Add the person your practice works with most often.</p><button onClick={() => setAdding(true)}><Plus />Add first contact</button></div>}
+      </div>
+    </section>
+  );
+}
+
+function ClientActivity({
+  client,
+  contacts,
+  activities,
+  annualFiles,
+  mutate,
+  notify,
+}: {
+  client: Client;
+  contacts: ClientContact[];
+  activities: ClientActivity[];
+  annualFiles: Engagement[];
+  mutate: Mutate;
+  notify: Notify;
+}) {
+  const [adding, setAdding] = useState(false),
+    [formError, setFormError] = useState("");
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form).entries());
+    const hasNextAction = Boolean(String(values.nextAction || "").trim());
+    const hasFollowUpDate = Boolean(values.followUpDate);
+    if (hasNextAction !== hasFollowUpDate) {
+      setFormError("Add both a next action and follow-up date, or leave both blank.");
+      return;
+    }
+    setFormError("");
+    await mutate("createClientActivity", {
+      ...values,
+      clientId: client.id,
+      contactId: values.contactId || undefined,
+      engagementId: values.engagementId || undefined,
+      followUpDate: values.followUpDate || undefined,
+    });
+    form.reset();
+    setAdding(false);
+    notify("Client activity recorded");
+  };
+  return (
+    <section className="panel crm-panel">
+      <div className="panel-title crm-panel-title">
+        <div><h2>Activity and follow-up</h2><p>A concise practice record of calls, meetings and relationship actions</p></div>
+        <button onClick={() => setAdding((open) => !open)} aria-expanded={adding}><Plus />Log activity</button>
+      </div>
+      {adding && (
+        <form className="crm-quick-form" onSubmit={submit}>
+          <div className="crm-form-heading"><div><strong>Log client activity</strong><small>Link it to an annual file only when the interaction is engagement-specific.</small></div><button type="button" className="icon-button" aria-label="Close activity form" onClick={() => setAdding(false)}><X /></button></div>
+          <div className="crm-form-grid crm-activity-form-grid">
+            <Select n="activityType" l="Activity type" v="CALL" o={["CALL", "EMAIL", "MEETING", "NOTE"]} />
+            <Field n="occurredAt" l="Date" type="date" v={new Date().toISOString().slice(0, 10)} required />
+            <Field n="subject" l="Subject" required />
+            <label>Contact<select name="contactId" defaultValue=""><option value="">General / not linked</option>{contacts.filter((item) => item.status === "ACTIVE").map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+            <label>Annual file (optional)<select name="engagementId" defaultValue=""><option value="">Relationship-level activity</option>{annualFiles.map((item) => <option value={item.id} key={item.id}>Year ended {fmtDate(item.periodEnd)}</option>)}</select></label>
+            <Field n="followUpDate" l="Follow-up date (optional)" type="date" />
+            <label className="crm-wide-field">Notes (optional)<textarea name="detail" placeholder="Briefly record the outcome or context." /></label>
+            <label className="crm-wide-field">Next action (optional)<input name="nextAction" aria-describedby="crm-followup-guidance" placeholder="What needs to happen next?" /></label>
+          </div>
+          <p className="crm-form-guidance" id="crm-followup-guidance">To schedule a follow-up, enter both the next action and its follow-up date.</p>
+          {formError && <p className="crm-form-error" role="alert">{formError}</p>}
+          <footer><button type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</button><button className="primary" type="submit"><Save />Save activity</button></footer>
+        </form>
+      )}
+      <div className="crm-timeline">
+        {activities.map((item) => {
+          const contact = contacts.find((entry) => entry.id === item.contactId);
+          const engagement = annualFiles.find((entry) => entry.id === item.engagementId);
+          return (
+            <article key={item.id}>
+              <span className={`crm-timeline-icon ${item.activityType.toLowerCase()}`}>{item.activityType === "EMAIL" ? <Mail /> : item.activityType === "MEETING" ? <Users /> : item.activityType === "NOTE" ? <FileText /> : <Phone />}</span>
+              <div className="crm-timeline-body">
+                <header><div><strong>{item.subject}</strong><small>{label(item.activityType)} · {fmtDate(item.occurredAt)}{contact ? ` · ${contact.name}` : ""}{engagement ? ` · year ended ${fmtDate(engagement.periodEnd)}` : ""}</small></div></header>
+                {item.detail && <p>{item.detail}</p>}
+                {item.followUpDate && (
+                  <div className={`crm-followup ${item.completedAt ? "complete" : ""}`}><CalendarClock /><span><small>{item.completedAt ? "COMPLETED" : `FOLLOW UP · ${fmtDate(item.followUpDate)}`}</small><strong>{item.nextAction || "Follow up with client"}</strong></span>{!item.completedAt && <button className="secondary" onClick={() => handleUiAction(async () => { await mutate("completeClientFollowUp", { activityId: item.id }); notify("Follow-up completed"); })}><Check />Mark done</button>}</div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+        {!activities.length && <div className="crm-empty-state"><Activity /><strong>No activity recorded</strong><p>Keep a light-touch history of relationship calls, meetings and follow-ups.</p><button onClick={() => setAdding(true)}><Plus />Log first activity</button></div>}
+      </div>
+    </section>
   );
 }
 
@@ -3897,6 +4211,9 @@ function Breadcrumbs({
   goEngagement: () => void;
 }) {
   const sectionLabels: Record<ClientSection, string> = {
+    overview: "Overview",
+    contacts: "Contacts",
+    activity: "Activity",
     permanent: "Permanent file",
     annual: "Annual files",
     governance: "Governance & access",

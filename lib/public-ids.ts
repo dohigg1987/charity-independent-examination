@@ -22,6 +22,8 @@ export type PublicEntity =
   | "signoff"
   | "trustee"
   | "clientUser"
+  | "clientContact"
+  | "clientActivity"
   | "concern"
   | "concernEvent"
   | "fileLockEvent"
@@ -50,7 +52,8 @@ export async function resolvePublicId(
     thread: s.conversationThreads, message: s.conversationMessages,
     reviewNote: s.reviewNotes, document: s.documents, permanentDocument: s.permanentDocuments,
     workpaperVersion: s.workpaperVersions, signoff: s.signoffs, trustee: s.trustees,
-    clientUser: s.clientUsers, concern: s.concerns, concernEvent: s.concernEvents,
+    clientUser: s.clientUsers, clientContact: s.clientContacts, clientActivity: s.clientActivities,
+    concern: s.concerns, concernEvent: s.concernEvents,
     fileLockEvent: s.fileLockEvents, tbImport: s.tbImports, tbAccount: s.tbAccounts,
     tbAnalytic: s.tbAnalytics, tbReconciliation: s.tbReconciliations,
   };
@@ -79,7 +82,8 @@ const auditEntityTypes: Record<string, PublicEntity> = {
   comment: "comment", conversation_thread: "thread", conversation_message: "message",
   review_note: "reviewNote", document: "document", permanent_document: "permanentDocument",
   workpaper_version: "workpaperVersion", signoff: "signoff", trustee: "trustee",
-  client_user: "clientUser", concern: "concern", concern_event: "concernEvent",
+  client_user: "clientUser", client_contact: "clientContact", client_activity: "clientActivity",
+  concern: "concern", concern_event: "concernEvent",
   file_lock_event: "fileLockEvent", tb_import: "tbImport", tb_account: "tbAccount",
   tb_analytic: "tbAnalytic", tb_reconciliation: "tbReconciliation",
 };
@@ -95,7 +99,8 @@ async function publicIdForInternal(tenantId: string, entity: PublicEntity, value
     thread: s.conversationThreads, message: s.conversationMessages,
     reviewNote: s.reviewNotes, document: s.documents, permanentDocument: s.permanentDocuments,
     workpaperVersion: s.workpaperVersions, signoff: s.signoffs, trustee: s.trustees,
-    clientUser: s.clientUsers, concern: s.concerns, concernEvent: s.concernEvents,
+    clientUser: s.clientUsers, clientContact: s.clientContacts, clientActivity: s.clientActivities,
+    concern: s.concerns, concernEvent: s.concernEvents,
     fileLockEvent: s.fileLockEvents, tbImport: s.tbImports, tbAccount: s.tbAccounts,
     tbAnalytic: s.tbAnalytics, tbReconciliation: s.tbReconciliations,
   };
@@ -146,6 +151,8 @@ const bodyIdFields: Record<string, PublicEntity> = {
   signoffId: "signoff",
   trusteeId: "trustee",
   clientUserId: "clientUser",
+  contactId: "clientContact",
+  activityId: "clientActivity",
   concernId: "concern",
   concernEventId: "concernEvent",
   lockEventId: "fileLockEvent",
@@ -199,7 +206,8 @@ export function externaliseState(
     users: byId(rows("users")), documents: byId(rows("documents")), imports: byId(rows("tbImports")), accounts: byId(rows("tbAccounts")),
     notes: byId(rows("notes")), permanentDocuments: byId(rows("permanentDocuments")),
     versions: byId(rows("versions")), signoffs: byId(rows("signoffs")), trustees: byId(rows("trustees")),
-    clientUsers: byId(rows("clientUsers")), concernEvents: byId(rows("concernEvents")),
+    clientUsers: byId(rows("clientUsers")), clientContacts: byId(rows("clientContacts")),
+    clientActivities: byId(rows("clientActivities")), concernEvents: byId(rows("concernEvents")),
     lockEvents: byId(rows("lockEvents")), analytics: byId(rows("tbAnalytics")),
     reconciliations: byId(rows("tbReconciliations")),
   };
@@ -215,7 +223,8 @@ export function externaliseState(
     comment: maps.comments, conversation_thread: maps.conversations, conversation_message: maps.messages,
     review_note: maps.notes, document: maps.documents, permanent_document: maps.permanentDocuments,
     workpaper_version: maps.versions, signoff: maps.signoffs, trustee: maps.trustees,
-    client_user: maps.clientUsers, concern: maps.concerns, concern_event: maps.concernEvents,
+    client_user: maps.clientUsers, client_contact: maps.clientContacts,
+    client_activity: maps.clientActivities, concern: maps.concerns, concern_event: maps.concernEvents,
     file_lock_event: maps.lockEvents, tb_import: maps.imports, tb_account: maps.accounts,
     tb_analytic: maps.analytics, tb_reconciliation: maps.reconciliations,
   };
@@ -246,6 +255,8 @@ export function externaliseState(
     versions: convert("versions", { taskId: maps.tasks }),
     signoffs: convert("signoffs", { engagementId: maps.engagements, taskId: maps.tasks, procedureId: maps.procedures }),
     trustees: convert("trustees", { clientId: maps.clients }), clientUsers: convert("clientUsers", { clientId: maps.clients }),
+    clientContacts: convert("clientContacts", { clientId: maps.clients }),
+    clientActivities: convert("clientActivities", { clientId: maps.clients, engagementId: maps.engagements, contactId: maps.clientContacts }),
     concerns: convert("concerns", { engagementId: maps.engagements, taskId: maps.tasks, procedureId: maps.procedures }),
     concernEvents: convert("concernEvents", { concernId: maps.concerns, engagementId: maps.engagements }),
     lockEvents: convert("lockEvents", { engagementId: maps.engagements }),

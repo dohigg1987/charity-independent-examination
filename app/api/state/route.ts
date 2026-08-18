@@ -8,6 +8,7 @@ import {
   isCommunicationAction,
 } from "@/lib/state-actions/communications";
 import { handleClientWorkpaperAction } from "@/lib/state-actions/client-workpapers";
+import { handleClientCrmAction } from "@/lib/state-actions/client-crm";
 import { handleRequestReviewAction } from "@/lib/state-actions/requests-review";
 import { handlePracticeAdminAction } from "@/lib/state-actions/practice-admin";
 import { handleConcernLockAction } from "@/lib/state-actions/concerns-lock";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     }
     const handlers = [
       handleClientWorkpaperAction,
+      handleClientCrmAction,
       handleRequestReviewAction,
       handlePracticeAdminAction,
       handleConcernLockAction,

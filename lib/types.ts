@@ -277,6 +277,18 @@ export type ClientUser = {
   lastAccessAt: string | null;
   createdAt: string;
 };
+export type ClientContact = {
+  id: PublicId; publicId: PublicId; clientId: PublicId;
+  name: string; role: string; email: string | null; phone: string | null;
+  isPrimary: boolean; status: string; createdAt: string; updatedAt: string;
+};
+export type ClientActivity = {
+  id: PublicId; publicId: PublicId; clientId: PublicId;
+  engagementId: PublicId | null; contactId: PublicId | null;
+  activityType: string; subject: string; detail: string; occurredAt: string;
+  nextAction: string; followUpDate: string | null; completedAt: string | null;
+  completedBy: string | null; createdBy: string; createdAt: string;
+};
 export type Concern = {
   id: PublicId;
   publicId: PublicId;
@@ -505,6 +517,8 @@ export type AppState = {
   signoffs: Signoff[];
   trustees: Trustee[];
   clientUsers: ClientUser[];
+  clientContacts: ClientContact[];
+  clientActivities: ClientActivity[];
   concerns: Concern[];
   concernEvents: ConcernEvent[];
   lockEvents: FileLockEvent[];
