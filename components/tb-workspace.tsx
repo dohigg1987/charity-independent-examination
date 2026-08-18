@@ -1,29 +1,846 @@
 "use client";
-import {useMemo,useRef,useState} from "react";
-import {AlertTriangle,BarChart3,Check,CheckCircle2,ChevronDown,Download,FileSpreadsheet,Link2,Send,ShieldCheck,UploadCloud} from "lucide-react";
-import type {AppState,Engagement,PublicId,TbAccount,TbAnalytic,TbReconciliation} from "@/lib/types";
+import { useMemo, useRef, useState } from "react";
+import {
+  Button,
+  Field,
+  Input,
+  Select,
+  Tab,
+  TabList,
+  Textarea,
+} from "@fluentui/react-components";
+import {
+  AlertTriangle,
+  BarChart3,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  Link2,
+  Send,
+  ShieldCheck,
+  UploadCloud,
+} from "lucide-react";
+import type {
+  AppState,
+  Engagement,
+  PublicId,
+  TbAccount,
+  TbAnalytic,
+  TbReconciliation,
+} from "@/lib/types";
 
-type Mutate=(action:string,payload?:Record<string,unknown>)=>Promise<AppState>;
-const lines=["UNMAPPED","Donations and legacies","Charitable activities income","Other trading activities","Investment income","Raising funds","Charitable activities expenditure","Cash at bank and in hand","Debtors","Creditors due within one year","Fixed assets","Investments","Restricted funds","Unrestricted funds","Endowment funds","Other"];
-const money=(value:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(value);
-const label=(value:string)=>value.toLowerCase().replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
-const fmt=(value:string)=>new Date(value.endsWith("Z")?value:value+"Z").toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-function parseIssues(value?:string){try{const parsed=JSON.parse(value||"[]");return Array.isArray(parsed)?parsed as string[]:["Validation results could not be read"]}catch{return ["Validation results could not be read"]}}
-
-export function TbWorkspace({state,engagement,mutate,notify}:{state:AppState;engagement:Engagement;mutate:Mutate;notify:(message:string)=>void}){
- const imports=useMemo(()=>state.tbImports.filter(x=>x.engagementId===engagement.id).sort((a,b)=>b.version-a.version),[state.tbImports,engagement.id]),[selectedId,setSelectedId]=useState(imports[0]?.id??null),[tab,setTab]=useState<"overview"|"accounts"|"analytics"|"reconciliation">("overview"),[busy,setBusy]=useState(false),[error,setError]=useState(""),[open,setOpen]=useState(true),[conclusion,setConclusion]=useState(imports[0]?.analysisConclusion??"");const input=useRef<HTMLInputElement>(null);
- const imported=imports.find(x=>x.id===selectedId)??imports[0],accounts=state.tbAccounts.filter(x=>x.tbImportId===imported?.id),analytics=state.tbAnalytics.filter(x=>x.tbImportId===imported?.id),reconciliations=state.tbReconciliations.filter(x=>x.tbImportId===imported?.id),mapped=accounts.filter(x=>x.statementLine!=="UNMAPPED").length,reviewed=analytics.filter(x=>x.status==="REVIEWED").length,reconciled=reconciliations.filter(x=>x.status!=="NOT_RECONCILED").length,locked=Boolean(engagement.lockedAt);
- const action=async(action:string,payload:Record<string,unknown>)=>{setBusy(true);setError("");try{const response=await fetch("/api/tb",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})}),json=await response.json();if(!response.ok)throw new Error(json.error||"Unable to update the trial balance");await mutate("refresh");return json}catch(reason){setError(reason instanceof Error?reason.message:"Unable to update the trial balance");throw reason}finally{setBusy(false)}};
- const upload=async(file?:File)=>{if(!file)return;setBusy(true);setError("");try{const form=new FormData();form.set("file",file);form.set("engagementId",String(engagement.id));const response=await fetch("/api/tb",{method:"POST",body:form}),json=await response.json();if(!response.ok)throw new Error(json.error||"Unable to import the trial balance");await mutate("refresh");const latest=json.tbImports?.filter((x:{engagementId:PublicId})=>x.engagementId===engagement.id).sort((a:{version:number},b:{version:number})=>b.version-a.version)[0];setSelectedId(latest?.id??null);setTab("overview");notify("Trial balance imported, validated and analysed")}catch(reason){setError(reason instanceof Error?reason.message:"Unable to import the trial balance")}finally{setBusy(false);if(input.current)input.current.value=""}};
- const issues=parseIssues(imported?.validationIssues);
- return <section className="tb-workspace"><button className="tb-heading" onClick={()=>setOpen(!open)}><span><FileSpreadsheet/><span><strong>Trial balance and analytical review</strong><small>Versioned TB ingestion, mapping, reconciliation and exception-led limited-assurance procedures</small></span></span><span>{imported?<b className={imported.isBalanced?"tb-pass":"tb-fail"}>{imported.isBalanced?"Balanced":"Validation required"}</b>:<b>No TB</b>}<ChevronDown/></span></button>{open&&<div className="tb-body"><div className="tb-toolbar"><div>{imports.length>0&&<label>TB version<select value={imported?.id??""} onChange={e=>{const id=e.target.value;setSelectedId(id);setConclusion(imports.find(x=>x.id===id)?.analysisConclusion??"")}}>{imports.map(x=><option key={x.id} value={x.id}>Version {x.version} · {x.fileName} · {fmt(x.createdAt)}</option>)}</select></label>}</div><div><a className="secondary" href="/api/tb?template=1"><Download/>CSV template</a><label className={`primary ${locked?"disabled-link":""}`}><UploadCloud/>{busy?"Processing…":"Import TB CSV"}<input ref={input} disabled={busy||locked} type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={e=>upload(e.target.files?.[0])}/></label></div></div>{error&&<div className="tb-error" role="alert"><AlertTriangle/>{error}<button aria-label="Dismiss trial balance error" onClick={()=>setError("")}>×</button></div>}{!imported?<div className="tb-empty"><FileSpreadsheet/><h3>Import the annual trial balance</h3><p>Use the controlled CSV template or a compatible accounting-system export. The original file will be retained with its content hash.</p></div>:<><nav className="tb-tabs" aria-label="Trial balance analysis"><button className={tab==="overview"?"active":""} onClick={()=>setTab("overview")}>Overview</button><button className={tab==="accounts"?"active":""} onClick={()=>setTab("accounts")}>Accounts <b>{mapped}/{accounts.length}</b></button><button className={tab==="analytics"?"active":""} onClick={()=>setTab("analytics")}>Analytical review <b>{analytics.length-reviewed}</b></button><button className={tab==="reconciliation"?"active":""} onClick={()=>setTab("reconciliation")}>TB to accounts <b>{reconciled}/{reconciliations.length}</b></button></nav>{tab==="overview"&&<Overview imported={imported} issues={issues} accounts={accounts} analytics={analytics} reconciliations={reconciliations}/>} {tab==="accounts"&&<div className="tb-account-table"><div className="tb-account-head"><span>ACCOUNT</span><span>FUND</span><span>STATEMENT LINE</span><span>CURRENT</span><span>PRIOR</span><span>BUDGET</span><span/></div>{accounts.map(account=><AccountRow key={`${account.id}:${account.fund}:${account.statementLine}:${account.noteReference}`} account={account} locked={locked} busy={busy} save={async payload=>{await action("updateTbAccount",{accountId:account.id,...payload});notify("TB account mapping saved")}}/>)}</div>} {tab==="analytics"&&<div className="tb-analytics"><div className="tb-method-note"><BarChart3/><p><strong>Exception-led analytical review</strong>Thresholds identify accounts requiring professional judgement. They do not constitute audit materiality or mandate substantive testing.</p></div>{analytics.map(item=><AnalyticRow key={`${item.id}:${item.status}:${item.explanation}:${item.targetedWork}:${item.conclusion}`} analytic={item} locked={locked} busy={busy} act={action} notify={notify}/>)}{!analytics.length&&<div className="tb-clear"><CheckCircle2/><strong>No threshold exceptions identified</strong><p>The examiner should still consider qualitative, fraud-related and regulatory matters that automated analysis cannot determine.</p></div>}</div>} {tab==="reconciliation"&&<div className="tb-reconciliations"><div className="tb-method-note"><Link2/><p><strong>TB-to-draft-accounts reconciliation</strong>Enter each corresponding draft-accounts amount. Differences require explanation and remain visible until cleared.</p></div>{reconciliations.map(row=><ReconciliationRow key={`${row.id}:${row.accountsAmount}:${row.explanation}`} row={row} locked={locked} busy={busy} save={async payload=>{await action("updateTbReconciliation",{reconciliationId:row.id,...payload});notify("Statement reconciliation saved")}}/>)}</div>}<div className="tb-signoff"><div><ShieldCheck/><p><strong>Overall analytical review conclusion</strong><span>{imported.preparedBy?`Prepared by ${imported.preparedBy}`:"Preparation outstanding"}{imported.reviewedBy?` · Reviewed by ${imported.reviewedBy}`:""}</span></p></div><textarea disabled={locked} value={conclusion} onChange={e=>setConclusion(e.target.value)} placeholder="Conclude whether the analytical review, reconciliations and targeted follow-up support the limited-assurance engagement."/><div><button className="secondary" disabled={busy||locked} onClick={async()=>{await action("signoffTb",{tbImportId:imported.id,status:"PREPARED",conclusion});notify("TB analysis prepared")}}><Check/>Prepare</button><button className="primary" disabled={busy||locked} onClick={async()=>{await action("signoffTb",{tbImportId:imported.id,status:"REVIEWED",conclusion});notify("TB analysis reviewed")}}><ShieldCheck/>Review sign-off</button></div></div></>}</div>}</section>;
+type Mutate = (
+  action: string,
+  payload?: Record<string, unknown>,
+) => Promise<AppState>;
+const lines = [
+  "UNMAPPED",
+  "Donations and legacies",
+  "Charitable activities income",
+  "Other trading activities",
+  "Investment income",
+  "Raising funds",
+  "Charitable activities expenditure",
+  "Cash at bank and in hand",
+  "Debtors",
+  "Creditors due within one year",
+  "Fixed assets",
+  "Investments",
+  "Restricted funds",
+  "Unrestricted funds",
+  "Endowment funds",
+  "Other",
+];
+const money = (value: number) =>
+  new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  }).format(value);
+const label = (value: string) =>
+  value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+const fmt = (value: string) =>
+  new Date(value.endsWith("Z") ? value : value + "Z").toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+function parseIssues(value?: string) {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed)
+      ? (parsed as string[])
+      : ["Validation results could not be read"];
+  } catch {
+    return ["Validation results could not be read"];
+  }
 }
 
-function Overview({imported,issues,accounts,analytics,reconciliations}:{imported:AppState["tbImports"][number];issues:string[];accounts:TbAccount[];analytics:TbAnalytic[];reconciliations:TbReconciliation[]}){const mapped=accounts.filter(x=>x.statementLine!=="UNMAPPED").length,reviewed=analytics.filter(x=>x.status==="REVIEWED").length,reconciled=reconciliations.filter(x=>x.status!=="NOT_RECONCILED").length;return <div className="tb-overview"><div className="tb-metrics"><Metric title="TB control" value={imported.isBalanced?"Balanced":"Out of balance"} note={`${money(imported.debitTotal)} debits · ${money(imported.creditTotal)} credits`} pass={imported.isBalanced}/><Metric title="Account mapping" value={`${mapped}/${accounts.length}`} note={`${accounts.length-mapped} require mapping`} pass={mapped===accounts.length}/><Metric title="Analytical exceptions" value={`${reviewed}/${analytics.length}`} note={`${analytics.length-reviewed} require conclusion`} pass={reviewed===analytics.length}/><Metric title="Statement reconciliation" value={`${reconciled}/${reconciliations.length}`} note={`${reconciliations.length-reconciled} require clearance`} pass={reconciled===reconciliations.length}/></div><div className="tb-overview-grid"><article><h3>Import control</h3><dl><div><dt>Source</dt><dd>{imported.fileName}</dd></div><div><dt>Version</dt><dd>{imported.version}</dd></div><div><dt>Rows</dt><dd>{imported.rowCount}</dd></div><div><dt>Net balance</dt><dd>{money(imported.netTotal)}</dd></div><div><dt>Uploaded by</dt><dd>{imported.uploadedBy}</dd></div><div><dt>Imported</dt><dd>{fmt(imported.createdAt)}</dd></div></dl></article><article><h3>Validation findings</h3>{issues.length?<ul>{issues.map((issue,index)=><li key={index}><AlertTriangle/>{issue}</li>)}</ul>:<p className="tb-valid"><CheckCircle2/>Structural validation completed without exception.</p>}</article></div></div>}
-function Metric({title,value,note,pass}:{title:string;value:string;note:string;pass:boolean}){return <article className={pass?"pass":"attention"}>{pass?<CheckCircle2/>:<AlertTriangle/>}<span><small>{title}</small><strong>{value}</strong><i>{note}</i></span></article>}
+export function TbWorkspace({
+  state,
+  engagement,
+  mutate,
+  notify,
+}: {
+  state: AppState;
+  engagement: Engagement;
+  mutate: Mutate;
+  notify: (message: string) => void;
+}) {
+  const imports = useMemo(
+      () =>
+        state.tbImports
+          .filter((x) => x.engagementId === engagement.id)
+          .sort((a, b) => b.version - a.version),
+      [state.tbImports, engagement.id],
+    ),
+    [selectedId, setSelectedId] = useState(imports[0]?.id ?? null),
+    [tab, setTab] = useState<
+      "overview" | "accounts" | "analytics" | "reconciliation"
+    >("overview"),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [open, setOpen] = useState(true),
+    [conclusion, setConclusion] = useState(
+      imports[0]?.analysisConclusion ?? "",
+    );
+  const input = useRef<HTMLInputElement>(null);
+  const imported = imports.find((x) => x.id === selectedId) ?? imports[0],
+    accounts = state.tbAccounts.filter((x) => x.tbImportId === imported?.id),
+    analytics = state.tbAnalytics.filter((x) => x.tbImportId === imported?.id),
+    reconciliations = state.tbReconciliations.filter(
+      (x) => x.tbImportId === imported?.id,
+    ),
+    mapped = accounts.filter((x) => x.statementLine !== "UNMAPPED").length,
+    reviewed = analytics.filter((x) => x.status === "REVIEWED").length,
+    reconciled = reconciliations.filter(
+      (x) => x.status !== "NOT_RECONCILED",
+    ).length,
+    locked = Boolean(engagement.lockedAt);
+  const action = async (action: string, payload: Record<string, unknown>) => {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/tb", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, ...payload }),
+        }),
+        json = await response.json();
+      if (!response.ok)
+        throw new Error(json.error || "Unable to update the trial balance");
+      await mutate("refresh");
+      return json;
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to update the trial balance",
+      );
+      throw reason;
+    } finally {
+      setBusy(false);
+    }
+  };
+  const upload = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("engagementId", String(engagement.id));
+      const response = await fetch("/api/tb", { method: "POST", body: form }),
+        json = await response.json();
+      if (!response.ok)
+        throw new Error(json.error || "Unable to import the trial balance");
+      await mutate("refresh");
+      const latest = json.tbImports
+        ?.filter(
+          (x: { engagementId: PublicId }) => x.engagementId === engagement.id,
+        )
+        .sort(
+          (a: { version: number }, b: { version: number }) =>
+            b.version - a.version,
+        )[0];
+      setSelectedId(latest?.id ?? null);
+      setTab("overview");
+      notify("Trial balance imported, validated and analysed");
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to import the trial balance",
+      );
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+  const issues = parseIssues(imported?.validationIssues);
+  return (
+    <section className="tb-workspace">
+      <button className="tb-heading" onClick={() => setOpen(!open)}>
+        <span>
+          <FileSpreadsheet />
+          <span>
+            <strong>Trial balance and analytical review</strong>
+            <small>
+              Versioned TB ingestion, mapping, reconciliation and exception-led
+              limited-assurance procedures
+            </small>
+          </span>
+        </span>
+        <span>
+          {imported ? (
+            <b className={imported.isBalanced ? "tb-pass" : "tb-fail"}>
+              {imported.isBalanced ? "Balanced" : "Validation required"}
+            </b>
+          ) : (
+            <b>No TB</b>
+          )}
+          <ChevronDown />
+        </span>
+      </button>
+      {open && (
+        <div className="tb-body">
+          <div className="tb-toolbar">
+            <div>
+              {imports.length > 0 && (
+                <Field label="TB version">
+                  <Select
+                    value={imported?.id ?? ""}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedId(id);
+                      setConclusion(
+                        imports.find((x) => x.id === id)?.analysisConclusion ??
+                          "",
+                      );
+                    }}
+                  >
+                    {imports.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        Version {x.version} · {x.fileName} · {fmt(x.createdAt)}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+            </div>
+            <div>
+              <a className="secondary" href="/api/tb?template=1">
+                <Download />
+                CSV template
+              </a>
+              <label className={`primary ${locked ? "disabled-link" : ""}`}>
+                <UploadCloud />
+                {busy ? "Processing…" : "Import TB CSV"}
+                <input
+                  ref={input}
+                  disabled={busy || locked}
+                  type="file"
+                  accept=".csv,.tsv,text/csv,text/tab-separated-values"
+                  onChange={(e) => upload(e.target.files?.[0])}
+                />
+              </label>
+            </div>
+          </div>
+          {error && (
+            <div className="tb-error" role="alert">
+              <AlertTriangle />
+              {error}
+              <button
+                aria-label="Dismiss trial balance error"
+                onClick={() => setError("")}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {!imported ? (
+            <div className="tb-empty">
+              <FileSpreadsheet />
+              <h3>Import the annual trial balance</h3>
+              <p>
+                Use the controlled CSV template or a compatible
+                accounting-system export. The original file will be retained
+                with its content hash.
+              </p>
+            </div>
+          ) : (
+            <>
+              <TabList
+                className="tb-tabs"
+                aria-label="Trial balance analysis"
+                selectedValue={tab}
+                onTabSelect={(_, data) => setTab(data.value as typeof tab)}
+              >
+                <Tab value="overview">
+                  Overview
+                </Tab>
+                <Tab value="accounts">
+                  Accounts{" "}
+                  <b>
+                    {mapped}/{accounts.length}
+                  </b>
+                </Tab>
+                <Tab value="analytics">
+                  Analytical review <b>{analytics.length - reviewed}</b>
+                </Tab>
+                <Tab value="reconciliation">
+                  TB to accounts{" "}
+                  <b>
+                    {reconciled}/{reconciliations.length}
+                  </b>
+                </Tab>
+              </TabList>
+              {tab === "overview" && (
+                <Overview
+                  imported={imported}
+                  issues={issues}
+                  accounts={accounts}
+                  analytics={analytics}
+                  reconciliations={reconciliations}
+                />
+              )}{" "}
+              {tab === "accounts" && (
+                <div className="tb-account-table">
+                  <div className="tb-account-head">
+                    <span>ACCOUNT</span>
+                    <span>FUND</span>
+                    <span>STATEMENT LINE</span>
+                    <span>CURRENT</span>
+                    <span>PRIOR</span>
+                    <span>BUDGET</span>
+                    <span />
+                  </div>
+                  {accounts.map((account) => (
+                    <AccountRow
+                      key={`${account.id}:${account.fund}:${account.statementLine}:${account.noteReference}`}
+                      account={account}
+                      locked={locked}
+                      busy={busy}
+                      save={async (payload) => {
+                        await action("updateTbAccount", {
+                          accountId: account.id,
+                          ...payload,
+                        });
+                        notify("TB account mapping saved");
+                      }}
+                    />
+                  ))}
+                </div>
+              )}{" "}
+              {tab === "analytics" && (
+                <div className="tb-analytics">
+                  <div className="tb-method-note">
+                    <BarChart3 />
+                    <p>
+                      <strong>Exception-led analytical review</strong>Thresholds
+                      identify accounts requiring professional judgement. They
+                      do not constitute audit materiality or mandate substantive
+                      testing.
+                    </p>
+                  </div>
+                  {analytics.map((item) => (
+                    <AnalyticRow
+                      key={`${item.id}:${item.status}:${item.explanation}:${item.targetedWork}:${item.conclusion}`}
+                      analytic={item}
+                      locked={locked}
+                      busy={busy}
+                      act={action}
+                      notify={notify}
+                    />
+                  ))}
+                  {!analytics.length && (
+                    <div className="tb-clear">
+                      <CheckCircle2 />
+                      <strong>No threshold exceptions identified</strong>
+                      <p>
+                        The examiner should still consider qualitative,
+                        fraud-related and regulatory matters that automated
+                        analysis cannot determine.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}{" "}
+              {tab === "reconciliation" && (
+                <div className="tb-reconciliations">
+                  <div className="tb-method-note">
+                    <Link2 />
+                    <p>
+                      <strong>TB-to-draft-accounts reconciliation</strong>Enter
+                      each corresponding draft-accounts amount. Differences
+                      require explanation and remain visible until cleared.
+                    </p>
+                  </div>
+                  {reconciliations.map((row) => (
+                    <ReconciliationRow
+                      key={`${row.id}:${row.accountsAmount}:${row.explanation}`}
+                      row={row}
+                      locked={locked}
+                      busy={busy}
+                      save={async (payload) => {
+                        await action("updateTbReconciliation", {
+                          reconciliationId: row.id,
+                          ...payload,
+                        });
+                        notify("Statement reconciliation saved");
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="tb-signoff">
+                <div>
+                  <ShieldCheck />
+                  <p>
+                    <strong>Overall analytical review conclusion</strong>
+                    <span>
+                      {imported.preparedBy
+                        ? `Prepared by ${imported.preparedBy}`
+                        : "Preparation outstanding"}
+                      {imported.reviewedBy
+                        ? ` · Reviewed by ${imported.reviewedBy}`
+                        : ""}
+                    </span>
+                  </p>
+                </div>
+                <Textarea
+                  disabled={locked}
+                  value={conclusion}
+                  onChange={(_, data) => setConclusion(data.value)}
+                  resize="vertical"
+                  placeholder="Conclude whether the analytical review, reconciliations and targeted follow-up support the limited-assurance engagement."
+                />
+                <div>
+                  <Button
+                    appearance="secondary"
+                    icon={<Check />}
+                    className="secondary"
+                    disabled={busy || locked}
+                    onClick={async () => {
+                      await action("signoffTb", {
+                        tbImportId: imported.id,
+                        status: "PREPARED",
+                        conclusion,
+                      });
+                      notify("TB analysis prepared");
+                    }}
+                  >
+                    Prepare
+                  </Button>
+                  <Button
+                    appearance="primary"
+                    icon={<ShieldCheck />}
+                    className="primary"
+                    disabled={busy || locked}
+                    onClick={async () => {
+                      await action("signoffTb", {
+                        tbImportId: imported.id,
+                        status: "REVIEWED",
+                        conclusion,
+                      });
+                      notify("TB analysis reviewed");
+                    }}
+                  >
+                    Review sign-off
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
-function AccountRow({account,locked,busy,save}:{account:TbAccount;locked:boolean;busy:boolean;save:(payload:Record<string,unknown>)=>Promise<void>}){const [fund,setFund]=useState(account.fund),[statementLine,setStatementLine]=useState(account.statementLine),[noteReference,setNoteReference]=useState(account.noteReference);return <div className={`tb-account-row ${statementLine==="UNMAPPED"?"unmapped":""}`}><span><strong>{account.accountCode}</strong><small>{account.accountName}</small></span><input aria-label={`Fund for ${account.accountCode}`} disabled={locked} value={fund} onChange={e=>setFund(e.target.value)}/><select aria-label={`Statement line for ${account.accountCode}`} disabled={locked} value={statementLine} onChange={e=>setStatementLine(e.target.value)}>{lines.map(line=><option key={line}>{line}</option>)}</select><span>{money(account.currentBalance)}</span><span>{money(account.priorBalance)}</span><span>{money(account.budgetBalance)}</span><button aria-label={`Save mapping for ${account.accountCode}`} disabled={busy||locked} onClick={()=>save({fund,statementLine,noteReference})}><Check/></button><input className="tb-note-ref" aria-label={`Note reference for ${account.accountCode}`} disabled={locked} value={noteReference} onChange={e=>setNoteReference(e.target.value)} placeholder="Accounts note reference"/></div>}
+function Overview({
+  imported,
+  issues,
+  accounts,
+  analytics,
+  reconciliations,
+}: {
+  imported: AppState["tbImports"][number];
+  issues: string[];
+  accounts: TbAccount[];
+  analytics: TbAnalytic[];
+  reconciliations: TbReconciliation[];
+}) {
+  const mapped = accounts.filter((x) => x.statementLine !== "UNMAPPED").length,
+    reviewed = analytics.filter((x) => x.status === "REVIEWED").length,
+    reconciled = reconciliations.filter(
+      (x) => x.status !== "NOT_RECONCILED",
+    ).length;
+  return (
+    <div className="tb-overview">
+      <div className="tb-metrics">
+        <Metric
+          title="TB control"
+          value={imported.isBalanced ? "Balanced" : "Out of balance"}
+          note={`${money(imported.debitTotal)} debits · ${money(imported.creditTotal)} credits`}
+          pass={imported.isBalanced}
+        />
+        <Metric
+          title="Account mapping"
+          value={`${mapped}/${accounts.length}`}
+          note={`${accounts.length - mapped} require mapping`}
+          pass={mapped === accounts.length}
+        />
+        <Metric
+          title="Analytical exceptions"
+          value={`${reviewed}/${analytics.length}`}
+          note={`${analytics.length - reviewed} require conclusion`}
+          pass={reviewed === analytics.length}
+        />
+        <Metric
+          title="Statement reconciliation"
+          value={`${reconciled}/${reconciliations.length}`}
+          note={`${reconciliations.length - reconciled} require clearance`}
+          pass={reconciled === reconciliations.length}
+        />
+      </div>
+      <div className="tb-overview-grid">
+        <article>
+          <h3>Import control</h3>
+          <dl>
+            <div>
+              <dt>Source</dt>
+              <dd>{imported.fileName}</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd>{imported.version}</dd>
+            </div>
+            <div>
+              <dt>Rows</dt>
+              <dd>{imported.rowCount}</dd>
+            </div>
+            <div>
+              <dt>Net balance</dt>
+              <dd>{money(imported.netTotal)}</dd>
+            </div>
+            <div>
+              <dt>Uploaded by</dt>
+              <dd>{imported.uploadedBy}</dd>
+            </div>
+            <div>
+              <dt>Imported</dt>
+              <dd>{fmt(imported.createdAt)}</dd>
+            </div>
+          </dl>
+        </article>
+        <article>
+          <h3>Validation findings</h3>
+          {issues.length ? (
+            <ul>
+              {issues.map((issue, index) => (
+                <li key={index}>
+                  <AlertTriangle />
+                  {issue}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="tb-valid">
+              <CheckCircle2 />
+              Structural validation completed without exception.
+            </p>
+          )}
+        </article>
+      </div>
+    </div>
+  );
+}
+function Metric({
+  title,
+  value,
+  note,
+  pass,
+}: {
+  title: string;
+  value: string;
+  note: string;
+  pass: boolean;
+}) {
+  return (
+    <article className={pass ? "pass" : "attention"}>
+      {pass ? <CheckCircle2 /> : <AlertTriangle />}
+      <span>
+        <small>{title}</small>
+        <strong>{value}</strong>
+        <i>{note}</i>
+      </span>
+    </article>
+  );
+}
 
-function AnalyticRow({analytic,locked,busy,act,notify}:{analytic:TbAnalytic;locked:boolean;busy:boolean;act:(action:string,payload:Record<string,unknown>)=>Promise<unknown>;notify:(message:string)=>void}){const [open,setOpen]=useState(false),[explanation,setExplanation]=useState(analytic.explanation),[targetedWork,setTargetedWork]=useState(analytic.targetedWork),[conclusion,setConclusion]=useState(analytic.conclusion);const save=async(status:string)=>{await act("saveAnalytic",{analyticId:analytic.id,explanation,targetedWork,conclusion,status});notify(`Analytical exception ${label(status)}`)};return <article className={`tb-analytic ${open?"open":""}`}><button className="tb-analytic-head" onClick={()=>setOpen(!open)}><span className={`tb-severity ${analytic.severity.toLowerCase()}`}>{analytic.severity}</span><span><strong>{analytic.title}</strong><small>{analytic.expectation}</small></span><span><b>{money(analytic.variance)}</b><small>{Math.round(analytic.variancePercent)}% variance</small></span><span className={`tb-status ${analytic.status.toLowerCase()}`}>{label(analytic.status)}</span><ChevronDown/></button>{open&&<div className="tb-analytic-body"><div className="variance-compare"><span><small>Actual</small><strong>{money(analytic.actual)}</strong></span><span><small>Comparator</small><strong>{money(analytic.comparator)}</strong></span><span><small>Planning significance</small><strong>{money(analytic.significanceThreshold)}</strong></span></div><label>Explanation obtained<textarea disabled={locked} value={explanation} onChange={e=>setExplanation(e.target.value)} placeholder="Record management's explanation and whether it is internally consistent."/></label><label>Targeted verification performed<textarea disabled={locked} value={targetedWork} onChange={e=>setTargetedWork(e.target.value)} placeholder="Record proportionate corroboration, evidence and cross-references."/></label><label>Analytical conclusion<textarea disabled={locked} value={conclusion} onChange={e=>setConclusion(e.target.value)} placeholder="Conclude the effect on the independent examination and reporting."/></label><footer><div><button className="secondary" disabled={busy||locked||Boolean(analytic.concernId)} onClick={async()=>{await act("escalateAnalytic",{analyticId:analytic.id});notify("Exception escalated to concerns")}}><AlertTriangle/>Escalate concern</button><button className="secondary" disabled={busy||locked} onClick={async()=>{await act("requestAnalyticEvidence",{analyticId:analytic.id});notify("Evidence request sent to client portal")}}><Send/>Request evidence</button></div><div><button className="secondary" disabled={busy||locked} onClick={()=>save("PREPARED")}><Check/>Prepare</button><button className="primary" disabled={busy||locked} onClick={()=>save("REVIEWED")}><ShieldCheck/>Review</button></div></footer></div>}</article>}
+function AccountRow({
+  account,
+  locked,
+  busy,
+  save,
+}: {
+  account: TbAccount;
+  locked: boolean;
+  busy: boolean;
+  save: (payload: Record<string, unknown>) => Promise<void>;
+}) {
+  const [fund, setFund] = useState(account.fund),
+    [statementLine, setStatementLine] = useState(account.statementLine),
+    [noteReference, setNoteReference] = useState(account.noteReference);
+  return (
+    <div
+      className={`tb-account-row ${statementLine === "UNMAPPED" ? "unmapped" : ""}`}
+    >
+      <span>
+        <strong>{account.accountCode}</strong>
+        <small>{account.accountName}</small>
+      </span>
+      <Input
+        aria-label={`Fund for ${account.accountCode}`}
+        disabled={locked}
+        value={fund}
+        onChange={(e) => setFund(e.target.value)}
+      />
+      <Select
+        aria-label={`Statement line for ${account.accountCode}`}
+        disabled={locked}
+        value={statementLine}
+        onChange={(e) => setStatementLine(e.target.value)}
+      >
+        {lines.map((line) => (
+          <option key={line}>{line}</option>
+        ))}
+      </Select>
+      <span>{money(account.currentBalance)}</span>
+      <span>{money(account.priorBalance)}</span>
+      <span>{money(account.budgetBalance)}</span>
+      <Button
+        appearance="subtle"
+        icon={<Check />}
+        aria-label={`Save mapping for ${account.accountCode}`}
+        disabled={busy || locked}
+        onClick={() => save({ fund, statementLine, noteReference })}
+      >
+      </Button>
+      <Input
+        className="tb-note-ref"
+        aria-label={`Note reference for ${account.accountCode}`}
+        disabled={locked}
+        value={noteReference}
+        onChange={(e) => setNoteReference(e.target.value)}
+        placeholder="Accounts note reference"
+      />
+    </div>
+  );
+}
 
-function ReconciliationRow({row,locked,busy,save}:{row:TbReconciliation;locked:boolean;busy:boolean;save:(payload:Record<string,unknown>)=>Promise<void>}){const [amount,setAmount]=useState(String(row.accountsAmount||"")),[explanation,setExplanation]=useState(row.explanation);const difference=row.tbAmount-Number(amount||0);return <article className="tb-reconciliation"><div><strong>{row.statementLine}</strong><small>Mapped TB balance</small></div><span>{money(row.tbAmount)}</span><label>Draft accounts amount<input disabled={locked} type="number" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)}/></label><span className={Math.abs(difference)<.01?"reconciled":"difference"}>{money(difference)}</span><label>Explanation<input disabled={locked} value={explanation} onChange={e=>setExplanation(e.target.value)} placeholder="Required where a difference remains"/></label><button disabled={busy||locked} onClick={()=>save({accountsAmount:Number(amount||0),explanation})}><Check/></button></article>}
+function AnalyticRow({
+  analytic,
+  locked,
+  busy,
+  act,
+  notify,
+}: {
+  analytic: TbAnalytic;
+  locked: boolean;
+  busy: boolean;
+  act: (action: string, payload: Record<string, unknown>) => Promise<unknown>;
+  notify: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false),
+    [explanation, setExplanation] = useState(analytic.explanation),
+    [targetedWork, setTargetedWork] = useState(analytic.targetedWork),
+    [conclusion, setConclusion] = useState(analytic.conclusion);
+  const save = async (status: string) => {
+    await act("saveAnalytic", {
+      analyticId: analytic.id,
+      explanation,
+      targetedWork,
+      conclusion,
+      status,
+    });
+    notify(`Analytical exception ${label(status)}`);
+  };
+  return (
+    <article className={`tb-analytic ${open ? "open" : ""}`}>
+      <button className="tb-analytic-head" onClick={() => setOpen(!open)}>
+        <span className={`tb-severity ${analytic.severity.toLowerCase()}`}>
+          {analytic.severity}
+        </span>
+        <span>
+          <strong>{analytic.title}</strong>
+          <small>{analytic.expectation}</small>
+        </span>
+        <span>
+          <b>{money(analytic.variance)}</b>
+          <small>{Math.round(analytic.variancePercent)}% variance</small>
+        </span>
+        <span className={`tb-status ${analytic.status.toLowerCase()}`}>
+          {label(analytic.status)}
+        </span>
+        <ChevronDown />
+      </button>
+      {open && (
+        <div className="tb-analytic-body">
+          <div className="variance-compare">
+            <span>
+              <small>Actual</small>
+              <strong>{money(analytic.actual)}</strong>
+            </span>
+            <span>
+              <small>Comparator</small>
+              <strong>{money(analytic.comparator)}</strong>
+            </span>
+            <span>
+              <small>Planning significance</small>
+              <strong>{money(analytic.significanceThreshold)}</strong>
+            </span>
+          </div>
+          <label>
+            Explanation obtained
+            <textarea
+              disabled={locked}
+              value={explanation}
+              onChange={(e) => setExplanation(e.target.value)}
+              placeholder="Record management's explanation and whether it is internally consistent."
+            />
+          </label>
+          <label>
+            Targeted verification performed
+            <textarea
+              disabled={locked}
+              value={targetedWork}
+              onChange={(e) => setTargetedWork(e.target.value)}
+              placeholder="Record proportionate corroboration, evidence and cross-references."
+            />
+          </label>
+          <label>
+            Analytical conclusion
+            <textarea
+              disabled={locked}
+              value={conclusion}
+              onChange={(e) => setConclusion(e.target.value)}
+              placeholder="Conclude the effect on the independent examination and reporting."
+            />
+          </label>
+          <footer>
+            <div>
+              <button
+                className="secondary"
+                disabled={busy || locked || Boolean(analytic.concernId)}
+                onClick={async () => {
+                  await act("escalateAnalytic", { analyticId: analytic.id });
+                  notify("Exception escalated to concerns");
+                }}
+              >
+                <AlertTriangle />
+                Escalate concern
+              </button>
+              <button
+                className="secondary"
+                disabled={busy || locked}
+                onClick={async () => {
+                  await act("requestAnalyticEvidence", {
+                    analyticId: analytic.id,
+                  });
+                  notify("Evidence request sent to client portal");
+                }}
+              >
+                <Send />
+                Request evidence
+              </button>
+            </div>
+            <div>
+              <button
+                className="secondary"
+                disabled={busy || locked}
+                onClick={() => save("PREPARED")}
+              >
+                <Check />
+                Prepare
+              </button>
+              <button
+                className="primary"
+                disabled={busy || locked}
+                onClick={() => save("REVIEWED")}
+              >
+                <ShieldCheck />
+                Review
+              </button>
+            </div>
+          </footer>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ReconciliationRow({
+  row,
+  locked,
+  busy,
+  save,
+}: {
+  row: TbReconciliation;
+  locked: boolean;
+  busy: boolean;
+  save: (payload: Record<string, unknown>) => Promise<void>;
+}) {
+  const [amount, setAmount] = useState(String(row.accountsAmount || "")),
+    [explanation, setExplanation] = useState(row.explanation);
+  const difference = row.tbAmount - Number(amount || 0);
+  return (
+    <article className="tb-reconciliation">
+      <div>
+        <strong>{row.statementLine}</strong>
+        <small>Mapped TB balance</small>
+      </div>
+      <span>{money(row.tbAmount)}</span>
+      <label>
+        Draft accounts amount
+        <input
+          disabled={locked}
+          type="number"
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </label>
+      <span
+        className={Math.abs(difference) < 0.01 ? "reconciled" : "difference"}
+      >
+        {money(difference)}
+      </span>
+      <label>
+        Explanation
+        <input
+          disabled={locked}
+          value={explanation}
+          onChange={(e) => setExplanation(e.target.value)}
+          placeholder="Required where a difference remains"
+        />
+      </label>
+      <button
+        disabled={busy || locked}
+        onClick={() =>
+          save({ accountsAmount: Number(amount || 0), explanation })
+        }
+      >
+        <Check />
+      </button>
+    </article>
+  );
+}

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Button, Field, Input, MessageBar, MessageBarBody } from "@fluentui/react-components";
+import { ArrowRight20Regular, Eye20Regular, EyeOff20Regular } from "@fluentui/react-icons";
 import { type FormEvent, useState } from "react";
 import { getAuthClient } from "@/lib/auth/client";
 
@@ -23,17 +24,14 @@ export function AuthForm({ returnTo }: { returnTo: string }) {
   }
   return (
     <form className="auth-form" onSubmit={submit} aria-busy={busy}>
-      <label className="auth-field"><span>Email address</span><input name="email" type="email" autoComplete="email" inputMode="email" placeholder="you@yourpractice.co.uk" required /></label>
-      <label className="auth-field">
-        <span className="auth-field-heading"><span>Password</span><Link href={`/auth/forgot-password?return_to=${encodeURIComponent(returnTo)}`}>Forgot password?</Link></span>
-        <span className="auth-password-input">
-          <input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" minLength={8} required />
-          <button type="button" className="auth-password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff /> : <Eye />}</button>
-        </span>
-      </label>
-      {message ? <p className="auth-message auth-message-error" role="alert">{message}</p> : null}
-      <button className="auth-submit" type="submit" disabled={busy}><span>{busy ? "Signing inâ€¦" : "Sign in"}</span>{!busy ? <ArrowRight aria-hidden="true" /> : null}</button>
+      <Field className="auth-field" label="Email address" required>
+        <Input name="email" type="email" autoComplete="email" inputMode="email" placeholder="you@yourpractice.co.uk" required size="large" />
+      </Field>
+      <Field className="auth-field" required label={<span className="auth-field-heading"><span>Password</span><Link href={`/auth/forgot-password?return_to=${encodeURIComponent(returnTo)}`}>Forgot password?</Link></span>}>
+        <Input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" minLength={8} required size="large" contentAfter={<Button type="button" appearance="subtle" size="small" icon={showPassword ? <EyeOff20Regular /> : <Eye20Regular />} onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"} />} />
+      </Field>
+      {message ? <MessageBar className="auth-message" intent="error"><MessageBarBody>{message}</MessageBarBody></MessageBar> : null}
+      <Button className="auth-submit" appearance="primary" size="large" type="submit" disabled={busy} iconPosition="after" icon={!busy ? <ArrowRight20Regular /> : undefined}>{busy ? "Signing in…" : "Sign in"}</Button>
     </form>
   );
 }
-

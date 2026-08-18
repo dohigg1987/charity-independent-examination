@@ -71,6 +71,10 @@ test("client and practitioner portals use the same server-backed conversation ac
     assert.match(surface, /messageReceipt/);
     assert.match(surface, /read \? "Read" : "Sent"/);
   }
+  assert.match(
+    practitioner,
+    /<Button\s+type="submit"[^>]*>[\s\S]*Send<\/Button>/,
+  );
 });
 
 test("conversation files are tenant-scoped and visible to authorised client participants only", async () => {

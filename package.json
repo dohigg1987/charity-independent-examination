@@ -21,6 +21,8 @@
     "cloudflare:config": "node scripts/render-cloudflare-config.mjs"
   },
   "dependencies": {
+    "@fluentui/react-components": "^9.74.6",
+    "@fluentui/react-icons": "^2.0.337",
     "@neondatabase/auth": "^0.5.0-beta",
     "drizzle-orm": "0.45.2",
     "lucide-react": "^0.468.0",

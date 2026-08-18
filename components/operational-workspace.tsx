@@ -3,6 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Dialog,
+  DialogSurface,
+  Field as FluentField,
+  Input as FluentInput,
+  SearchBox,
+  Select as FluentSelect,
+  Tab,
+  TabList,
+  Textarea,
+  Toolbar,
+  ToolbarButton,
+} from "@fluentui/react-components";
+import {
   Activity,
   AlertTriangle,
   Bell,
@@ -248,7 +265,8 @@ export function OperationalWorkspace() {
         onClick={() => mobileNavOpen && setMobileNavOpen(false)}
       >
         <Logo inverse />
-        <button
+        <Button
+          appearance="subtle"
           className="organisation-switch"
           onClick={(e) => {
             e.stopPropagation();
@@ -260,11 +278,12 @@ export function OperationalWorkspace() {
             <small>Organisation</small>{state.practiceName}
           </span>
           <ChevronDown />
-        </button>
+        </Button>
         <nav aria-label="Main navigation">
           <p className="nav-label">WORKSPACE</p>
           {nav.map((n) => (
-            <button
+            <Button
+              appearance="subtle"
               key={n.id}
               className={view === n.id ? "active" : ""}
               onClick={() => setView(n.id)}
@@ -291,7 +310,7 @@ export function OperationalWorkspace() {
                     }
                   </b>
                 )}
-            </button>
+            </Button>
           ))}
           <p className="nav-label lower">MANAGE</p>
           <Side
@@ -332,7 +351,8 @@ export function OperationalWorkspace() {
             <small>UK charity regulatory regimes</small>
           </span>
         </div>
-        <button
+        <Button
+          appearance="subtle"
           className="user-card"
           onClick={(e) => {
             e.stopPropagation();
@@ -345,7 +365,7 @@ export function OperationalWorkspace() {
             <small>{label(state.actor.role)}</small>
           </span>
           <MoreHorizontal />
-        </button>
+        </Button>
       </aside>
       {mobileNavOpen && (
         <button
@@ -356,21 +376,22 @@ export function OperationalWorkspace() {
       )}
       <main className="main">
         <header className="topbar">
-          <button
+          <Button
+            appearance="subtle"
             className="mobile-menu-button"
             aria-label="Open navigation"
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen((open) => !open)}
           >
             <Menu />
-          </button>
+          </Button>
           <div className="search">
-            <Search />
-            <input
+            <SearchBox
+              className="workspace-searchbox"
               aria-label="Search"
               placeholder="Search engagements, clients or workpapers"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(_, data) => setQuery(data.value)}
             />
             <kbd>⌘ K</kbd>
             {results && (
@@ -413,14 +434,16 @@ export function OperationalWorkspace() {
               </div>
             )}
           </div>
-          <div className="top-actions">
-            <button
+          <Toolbar className="top-actions" aria-label="Workspace actions">
+            <ToolbarButton
+              appearance="subtle"
               aria-label="Help"
               onClick={() => setDialog({ kind: "help" })}
             >
               <HelpCircle />
-            </button>
-            <button
+            </ToolbarButton>
+            <ToolbarButton
+              appearance="subtle"
               aria-label="Notifications"
               className="notification"
               onClick={(e) => {
@@ -430,7 +453,7 @@ export function OperationalWorkspace() {
             >
               <Bell />
               {openNotes.length + outstanding.length > 0 && <i />}
-            </button>
+            </ToolbarButton>
             <Link
               href={`/client?engagement=${active.id}`}
               className="portal-link"
@@ -438,7 +461,7 @@ export function OperationalWorkspace() {
               <LockKeyhole />
               Preview client portal
             </Link>
-          </div>
+          </Toolbar>
         </header>
         <Breadcrumbs
           view={view}
@@ -765,10 +788,10 @@ function Portfolio({
       title={`Good afternoon, ${state.actor.name.split(" ")[0]}`}
       desc="Current position across the independent examination portfolio."
       action={
-        <button className="primary" onClick={create}>
+        <Button appearance="primary" className="primary" onClick={create}>
           <Plus />
           {state.clients.length ? "New engagement" : "Add first client"}
-        </button>
+        </Button>
       }
     >
       <section className="stat-grid">
@@ -823,7 +846,8 @@ function Portfolio({
           <span />
         </div>
         {rows.map((e, i) => (
-          <button
+          <Button
+            appearance="subtle"
             className="engagement-row"
             key={e.id}
             onClick={() => open(e.id)}
@@ -841,9 +865,9 @@ function Portfolio({
             </span>
             <span>{fmtDate(e.periodEnd)}</span>
             <span>
-              <b className={`stage ${stageClass(e.status)}`}>
+              <Badge appearance="tint" color={e.status === "SIGNED" ? "success" : "brand"} className={`stage ${stageClass(e.status)}`}>
                 {label(e.status)}
-              </b>
+              </Badge>
             </span>
             <span className="progress-cell">
               <i>
@@ -853,7 +877,7 @@ function Portfolio({
             </span>
             <span>{label(e.risk)}</span>
             <ChevronRight />
-          </button>
+          </Button>
         ))}
         {!rows.length && (
           <div className="conversation-empty">
@@ -910,14 +934,15 @@ function EngagementView({
           <span>{fmtDate(engagement.periodEnd)}</span>
         </div>
         <div className="banner-actions">
-          <button className="secondary" onClick={edit}>
+          <Button appearance="secondary" className="secondary" onClick={edit}>
             Edit engagement
-          </button>
-          <button className="secondary" onClick={createTask}>
+          </Button>
+          <Button appearance="secondary" className="secondary" onClick={createTask}>
             <Plus />
             New task
-          </button>
-          <button
+          </Button>
+          <Button
+            appearance="primary"
             className="primary"
             onClick={async () => {
               await mutate("moveToReview", { engagementId: engagement.id });
@@ -925,7 +950,7 @@ function EngagementView({
             }}
           >
             Send for review
-          </button>
+          </Button>
         </div>
       </div>
       <div className="engagement-title">
@@ -1022,7 +1047,8 @@ function EngagementView({
                         <h3>Conclusion</h3>
                         <span className="required">REQUIRED</span>
                       </div>
-                      <textarea
+                      <Textarea
+                        resize="vertical"
                         maxLength={2000}
                         value={conclusion}
                         onChange={(e) => setConclusion(e.target.value)}
@@ -1057,27 +1083,30 @@ function EngagementView({
                         </p>
                       </div>
                       <div className="signoff-buttons">
-                        <button
+                        <Button
+                          appearance="secondary"
                           className="secondary"
                           onClick={() => save("IN_PROGRESS")}
                         >
                           <FileText />
                           Save draft
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          appearance="secondary"
                           className="secondary"
                           onClick={() => save("PREPARED")}
                         >
                           <Check />
                           Mark prepared
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          appearance="primary"
                           className="primary"
                           onClick={() => save("REVIEWED")}
                         >
                           <ShieldCheck />
                           Review sign-off
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -1183,9 +1212,8 @@ function ScopeSection({
         </p>
       </div>
       <div className="scope-grid">
-        <label>
-          Jurisdiction
-          <select
+        <FluentField label="Jurisdiction">
+          <FluentSelect
             value={jurisdiction}
             disabled
             title="Jurisdiction is pinned when the annual file is created"
@@ -1198,34 +1226,31 @@ function ScopeSection({
                   {item.name}
                 </option>
               ))}
-          </select>
-        </label>
-        <label>
-          Fund profile
-          <select
+          </FluentSelect>
+        </FluentField>
+        <FluentField label="Fund profile">
+          <FluentSelect
             value={fundProfile}
             onChange={(e) => setFundProfile(e.target.value)}
           >
             <option value="UNRESTRICTED_ONLY">Unrestricted only</option>
             <option value="MULTI_FUND">Multiple funds</option>
             <option value="ENDOWMENT">Endowment or special trusts</option>
-          </select>
-        </label>
-        <label>
-          Complexity
-          <select
+          </FluentSelect>
+        </FluentField>
+        <FluentField label="Complexity">
+          <FluentSelect
             value={complexity}
             onChange={(e) => setComplexity(e.target.value)}
           >
             <option value="LOW">Low</option>
             <option value="STANDARD">Standard</option>
             <option value="HIGH">High</option>
-          </select>
-        </label>
-        <label>
-          Methodology
-          <input value={engagement.methodologyVersion} disabled />
-        </label>
+          </FluentSelect>
+        </FluentField>
+        <FluentField label="Methodology">
+          <FluentInput value={engagement.methodologyVersion} disabled />
+        </FluentField>
       </div>
       <div className="threshold-strip">
         <span>
@@ -1250,26 +1275,24 @@ function ScopeSection({
             ],
           ] as const
         ).map(([key, text]) => (
-          <label key={key}>
-            <input
-              type="checkbox"
+          <Checkbox
+              key={key}
+              label={text}
               checked={overrides[key]}
-              onChange={(e) =>
-                setOverrides({ ...overrides, [key]: e.target.checked })
+              onChange={(_, data) =>
+                setOverrides({ ...overrides, [key]: Boolean(data.checked) })
               }
             />
-            {text}
-          </label>
         ))}
       </div>
-      <label className="scope-conclusion">
-        Proportionate scoping conclusion
-        <textarea
+      <FluentField className="scope-conclusion" label="Proportionate scoping conclusion">
+        <Textarea
+          resize="vertical"
           value={scope}
           onChange={(e) => setScope(e.target.value)}
           placeholder="Explain how income, assets, basis, legal form, funds, complexity and identified concerns shape the work programme."
         />
-      </label>
+      </FluentField>
       <footer>
         <span>
           {engagement.lockedAt ? (
@@ -1281,14 +1304,15 @@ function ScopeSection({
             "Scope determines which procedures apply and the depth of targeted work."
           )}
         </span>
-        <button
+        <Button
+          appearance="primary"
           className="primary"
           disabled={Boolean(engagement.lockedAt)}
           onClick={save}
         >
           <Check />
           Save scope
-        </button>
+        </Button>
       </footer>
     </section>
   );
@@ -1563,7 +1587,7 @@ function ProcedureWorkpaper({
   };
   return (
     <article className={`procedure-workpaper ${open ? "open" : ""}`}>
-      <button className="procedure-head" onClick={() => setOpen(!open)}>
+      <Button appearance="subtle" className="procedure-head" onClick={() => setOpen(!open)}>
         <Status s={procedure.status} />
         <span>
           <small>
@@ -1576,7 +1600,7 @@ function ProcedureWorkpaper({
           {docs.length} evidence · {label(procedure.status)}
         </span>
         <ChevronDown />
-      </button>
+      </Button>
       {open && (
         <div className="procedure-body">
           <div className="procedure-guidance">
@@ -1588,9 +1612,8 @@ function ProcedureWorkpaper({
             </p>
           </div>
           <div className="applicability-row">
-            <label>
-              Applicability
-              <select
+            <FluentField label="Applicability">
+              <FluentSelect
                 value={applicability}
                 disabled={locked}
                 onChange={(e) =>
@@ -1600,64 +1623,62 @@ function ProcedureWorkpaper({
                 <option value="APPLICABLE">Applicable</option>
                 <option value="NOT_APPLICABLE">Not applicable</option>
                 <option value="ESCALATED">Escalated targeted work</option>
-              </select>
-            </label>
-            <label className="concern-check">
-              <input
-                type="checkbox"
+              </FluentSelect>
+            </FluentField>
+            <Checkbox
+                className="concern-check"
+                label="Concern identified"
                 checked={concern}
                 disabled={locked}
-                onChange={(e) => setConcern(e.target.checked)}
+                onChange={(_, data) => setConcern(Boolean(data.checked))}
               />
-              Concern identified
-            </label>
           </div>
           {applicability === "NOT_APPLICABLE" && (
-            <label className="procedure-rationale">
-              Required rationale for not applying this procedure
-              <textarea
+            <FluentField className="procedure-rationale" label="Required rationale for not applying this procedure">
+              <Textarea
+                resize="vertical"
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
                 placeholder="Explain why the procedure does not apply to this charity and period."
               />
-            </label>
+            </FluentField>
           )}
           {(concern || applicability === "ESCALATED") && (
-            <label className="procedure-rationale escalated">
-              Concern and escalation rationale
-              <textarea
+            <FluentField className="procedure-rationale escalated" label="Concern and escalation rationale">
+              <Textarea
+                resize="vertical"
                 value={concernSummary}
                 onChange={(e) => setConcernSummary(e.target.value)}
                 placeholder="Describe the anomaly, its potential significance and the targeted work required."
               />
-            </label>
+            </FluentField>
           )}
           {applicability !== "NOT_APPLICABLE" && (
             <div className="procedure-fields">
-              <label>
-                Evidence obtained and cross-reference
-                <textarea
+              <FluentField label="Evidence obtained and cross-reference">
+                <Textarea
+                  resize="vertical"
                   value={evidence}
                   onChange={(e) => setEvidence(e.target.value)}
                   placeholder="Identify documents, schedules, enquiries, analytical outputs and relevant cross-references."
                 />
-              </label>
-              <label>
-                Work performed
-                <textarea
+              </FluentField>
+              <FluentField label="Work performed">
+                <Textarea
+                  resize="vertical"
                   value={work}
                   onChange={(e) => setWork(e.target.value)}
                   placeholder="Record enquiry, analytical review or targeted verification, including exceptions followed up."
                 />
-              </label>
-              <label>
-                Procedure conclusion
-                <textarea
+              </FluentField>
+              <FluentField label="Procedure conclusion">
+                <Textarea
+                  resize="vertical"
                   value={conclusion}
                   onChange={(e) => setConclusion(e.target.value)}
                   placeholder="Record the limited-assurance conclusion and any matter requiring escalation."
                 />
-              </label>
+              </FluentField>
             </div>
           )}
           <div className="procedure-evidence">
@@ -2066,10 +2087,10 @@ function Findings({
         <article><span>Closed</span><strong>{rows.filter((item) => isConcernClosed(item.status)).length}</strong><small>Retained with review history</small></article>
       </section>
       <div className="finding-filters">
-        <label><Search /><input aria-label="Search concerns" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reference, title, owner or description" /></label>
-        <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option>{["OPEN", "IN_PROGRESS", "READY_FOR_REVIEW", "CLOSED", "REOPENED", "RESOLVED"].map((item) => <option key={item}>{item}</option>)}</select>
-        <select aria-label="Filter by severity" value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="ALL">All severities</option>{["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((item) => <option key={item}>{item}</option>)}</select>
-        <select aria-label="Filter by category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="ALL">All categories</option>{["GENERAL", "ACCOUNTING_RECORDS", "ACCOUNTS_COMPLIANCE", "OTHER_MATTER", "MATERIAL_SIGNIFICANCE"].map((item) => <option key={item}>{label(item)}</option>)}</select>
+        <SearchBox aria-label="Search concerns" value={search} onChange={(_, data) => setSearch(data.value)} placeholder="Search reference, title, owner or description" />
+        <FluentSelect aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option>{["OPEN", "IN_PROGRESS", "READY_FOR_REVIEW", "CLOSED", "REOPENED", "RESOLVED"].map((item) => <option key={item}>{item}</option>)}</FluentSelect>
+        <FluentSelect aria-label="Filter by severity" value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="ALL">All severities</option>{["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((item) => <option key={item}>{item}</option>)}</FluentSelect>
+        <FluentSelect aria-label="Filter by category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="ALL">All categories</option>{["GENERAL", "ACCOUNTING_RECORDS", "ACCOUNTS_COMPLIANCE", "OTHER_MATTER", "MATERIAL_SIGNIFICANCE"].map((item) => <option key={item}>{label(item)}</option>)}</FluentSelect>
       </div>
       {creating && (
         <form
@@ -2091,10 +2112,10 @@ function Findings({
             });
           }}
         >
-          <header><div><p className="eyebrow">NEW CONTROLLED FINDING</p><h2>Create concern</h2></div><button type="button" onClick={() => setCreating(false)} aria-label="Close new concern form"><X /></button></header>
-          <div><label>Title<input name="title" required maxLength={160} /></label><label>Severity<select name="severity" defaultValue="MEDIUM"><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label><label>Category<select name="category" defaultValue="GENERAL"><option value="GENERAL">General</option><option value="ACCOUNTING_RECORDS">Accounting records</option><option value="ACCOUNTS_COMPLIANCE">Accounts compliance</option><option value="OTHER_MATTER">Other matter</option><option value="MATERIAL_SIGNIFICANCE">Material significance</option></select></label><label>Owner<input name="owner" defaultValue={state.actor.name} required /></label></div>
-          <label>Description<textarea name="description" required placeholder="Describe the anomaly, why it may be significant and the initial follow-up required." /></label>
-          <footer><button type="button" className="secondary" onClick={() => setCreating(false)}>Cancel</button><button className="primary"><Plus /> Create concern</button></footer>
+          <header><div><p className="eyebrow">NEW CONTROLLED FINDING</p><h2>Create concern</h2></div><Button appearance="subtle" type="button" onClick={() => setCreating(false)} aria-label="Close new concern form"><X /></Button></header>
+          <div><FluentField label="Title" required><FluentInput name="title" required maxLength={160} /></FluentField><FluentField label="Severity"><FluentSelect name="severity" defaultValue="MEDIUM"><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></FluentSelect></FluentField><FluentField label="Category"><FluentSelect name="category" defaultValue="GENERAL"><option value="GENERAL">General</option><option value="ACCOUNTING_RECORDS">Accounting records</option><option value="ACCOUNTS_COMPLIANCE">Accounts compliance</option><option value="OTHER_MATTER">Other matter</option><option value="MATERIAL_SIGNIFICANCE">Material significance</option></FluentSelect></FluentField><FluentField label="Owner" required><FluentInput name="owner" defaultValue={state.actor.name} required /></FluentField></div>
+          <TextAreaField n="description" l="Description" required placeholder="Describe the anomaly, why it may be significant and the initial follow-up required." />
+          <footer><Button appearance="secondary" type="button" className="secondary" onClick={() => setCreating(false)}>Cancel</Button><Button appearance="primary" type="submit" className="primary"><Plus /> Create concern</Button></footer>
         </form>
       )}
       <div className="finding-layout">
@@ -2699,10 +2720,10 @@ function Clients({
       title="Clients"
       desc="Permanent client records and distinct annual working-paper files."
       action={
-        <button className="primary" onClick={create}>
+        <Button appearance="primary" className="primary" onClick={create}>
           <Plus />
           New client
-        </button>
+        </Button>
       }
     >
       <div className="client-master-detail">
@@ -2738,9 +2759,9 @@ function Clients({
                   </p>
                 </div>
               </div>
-              <button className="secondary" onClick={() => edit(client)}>
+              <Button appearance="secondary" className="secondary" onClick={() => edit(client)}>
                 Edit profile
-              </button>
+              </Button>
               <dl>
                 <div>
                   <dt>Primary contact</dt>
@@ -2756,69 +2777,66 @@ function Clients({
                 </div>
               </dl>
             </div>
-            <nav
+            <TabList
+              vertical
               className="client-file-tabs"
               aria-label="Client record sections"
+              selectedValue={section}
+              onTabSelect={(_, data) => selectSection(data.value as ClientSection)}
             >
-              <button
+              <Tab
+                value="overview"
                 className={section === "overview" ? "active" : ""}
-                aria-current={section === "overview" ? "page" : undefined}
-                onClick={() => selectSection("overview")}
               >
                 <LayoutDashboard />
                 <span>
                   <strong>Overview</strong>
                   <small>Relationship at a glance</small>
                 </span>
-              </button>
-              <button
+              </Tab>
+              <Tab
+                value="contacts"
                 className={section === "contacts" ? "active" : ""}
-                aria-current={section === "contacts" ? "page" : undefined}
-                onClick={() => selectSection("contacts")}
               >
                 <Users />
                 <span>
                   <strong>Contacts</strong>
                   <small>{contacts.filter((item) => item.status === "ACTIVE").length} active</small>
                 </span>
-              </button>
-              <button
+              </Tab>
+              <Tab
+                value="activity"
                 className={section === "activity" ? "active" : ""}
-                aria-current={section === "activity" ? "page" : undefined}
-                onClick={() => selectSection("activity")}
               >
                 <Activity />
                 <span>
                   <strong>Activity</strong>
                   <small>{activities.filter((item) => item.followUpDate && !item.completedAt).length} follow-up(s)</small>
                 </span>
-              </button>
-              <button
+              </Tab>
+              <Tab
+                value="permanent"
                 className={section === "permanent" ? "active" : ""}
-                aria-current={section === "permanent" ? "page" : undefined}
-                onClick={() => selectSection("permanent")}
               >
                 <FolderOpen />
                 <span>
                   <strong>Permanent file</strong>
                   <small>{permanentCount} document(s)</small>
                 </span>
-              </button>
-              <button
+              </Tab>
+              <Tab
+                value="annual"
                 className={section === "annual" ? "active" : ""}
-                aria-current={section === "annual" ? "page" : undefined}
-                onClick={() => selectSection("annual")}
               >
                 <FileText />
                 <span>
                   <strong>Annual files</strong>
                   <small>{annualFiles.length} reporting period(s)</small>
                 </span>
-              </button>
-              <button
+              </Tab>
+              <Tab
+                value="governance"
                 className={section === "governance" ? "active" : ""}
-                aria-current={section === "governance" ? "page" : undefined}
-                onClick={() => selectSection("governance")}
               >
                 <Users />
                 <span>
@@ -2830,8 +2848,8 @@ function Clients({
                     {portalUsers.length === 1 ? "" : "s"}
                   </small>
                 </span>
-              </button>
-            </nav>
+              </Tab>
+            </TabList>
             {section === "overview" && (
               <ClientOverview
                 client={client}
@@ -3049,7 +3067,7 @@ function ClientOverview({
   const latestAnnual = annualFiles[0];
   return (
     <div className="client-overview-grid">
-      <section className="panel crm-summary-card">
+      <Card className="panel crm-summary-card">
         <header><span className="crm-icon"><Users /></span><div><p>RELATIONSHIP</p><h2>Key contact</h2></div></header>
         {primary ? (
           <div className="crm-key-contact">
@@ -3063,9 +3081,9 @@ function ClientOverview({
         ) : (
           <p className="crm-empty-copy">Add the first relationship contact for {client.name}.</p>
         )}
-        <button className="secondary crm-card-action" onClick={() => selectSection("contacts")}>Manage contacts <ChevronRight /></button>
-      </section>
-      <section className="panel crm-summary-card">
+        <Button appearance="secondary" className="secondary crm-card-action" onClick={() => selectSection("contacts")}>Manage contacts <ChevronRight /></Button>
+      </Card>
+      <Card className="panel crm-summary-card">
         <header><span className="crm-icon"><FolderOpen /></span><div><p>ENGAGEMENT</p><h2>Latest annual file</h2></div></header>
         {latestAnnual ? (
           <div className="crm-file-summary">
@@ -3074,12 +3092,12 @@ function ClientOverview({
             <small>{latestAnnual.accountingBasis}</small>
           </div>
         ) : <p className="crm-empty-copy">No annual working-paper file has been opened yet.</p>}
-        <button className="secondary crm-card-action" onClick={() => latestAnnual ? openAnnual(latestAnnual.id) : selectSection("annual")}>
+        <Button appearance="secondary" className="secondary crm-card-action" onClick={() => latestAnnual ? openAnnual(latestAnnual.id) : selectSection("annual")}>
           {latestAnnual ? "Open annual file" : "View annual files"} <ChevronRight />
-        </button>
-      </section>
-      <section className="panel crm-summary-card crm-followup-card">
-        <header><span className="crm-icon"><CalendarClock /></span><div><p>NEXT ACTION</p><h2>Follow-ups</h2></div><b>{followUps.length}</b></header>
+        </Button>
+      </Card>
+      <Card className="panel crm-summary-card crm-followup-card">
+        <header><span className="crm-icon"><CalendarClock /></span><div><p>NEXT ACTION</p><h2>Follow-ups</h2></div><Badge appearance="filled" color="brand">{followUps.length}</Badge></header>
         {followUps.slice(0, 3).map((item) => (
           <div className="crm-followup-preview" key={item.id}>
             <span className="crm-date-tile"><strong>{new Date(`${item.followUpDate}T00:00:00`).getDate()}</strong><small>{new Date(`${item.followUpDate}T00:00:00`).toLocaleDateString("en-GB", { month: "short" })}</small></span>
@@ -3087,8 +3105,8 @@ function ClientOverview({
           </div>
         ))}
         {!followUps.length && <p className="crm-empty-copy">Nothing is waiting for follow-up.</p>}
-        <button className="secondary crm-card-action" onClick={() => selectSection("activity")}>Open activity <ChevronRight /></button>
-      </section>
+        <Button appearance="secondary" className="secondary crm-card-action" onClick={() => selectSection("activity")}>Open activity <ChevronRight /></Button>
+      </Card>
       <section className="panel client-record-strip" aria-label="Client record summary">
         <span><small>Contacts</small><strong>{contacts.filter((item) => item.status === "ACTIVE").length}</strong></span>
         <span><small>Recorded activities</small><strong>{activities.length}</strong></span>
@@ -3128,7 +3146,7 @@ function ClientContacts({
     <section className="panel crm-panel">
       <div className="panel-title crm-panel-title">
         <div><h2>Relationship contacts</h2><p>People the practice works with across engagements</p></div>
-        <button onClick={() => setAdding((open) => !open)} aria-expanded={adding}><Plus />Add contact</button>
+        <Button appearance="primary" onClick={() => setAdding((open) => !open)} aria-expanded={adding}><Plus />Add contact</Button>
       </div>
       {adding && (
         <form className="crm-quick-form" onSubmit={submit}>
@@ -3140,14 +3158,14 @@ function ClientContacts({
             <Field n="phone" l="Phone (optional)" type="tel" />
           </div>
           <label className="crm-check"><input type="checkbox" name="isPrimary" /> Primary relationship contact</label>
-          <footer><button type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</button><button className="primary" type="submit"><Save />Save contact</button></footer>
+          <footer><Button appearance="secondary" type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</Button><Button appearance="primary" className="primary" type="submit"><Save />Save contact</Button></footer>
         </form>
       )}
       <div className="crm-contact-list">
         {contacts.map((contact) => (
           <article className={`crm-contact-row ${contact.status !== "ACTIVE" ? "inactive" : ""}`} key={contact.id}>
             <span className="avatar">{initials(contact.name)}</span>
-            <div><strong>{contact.name}{contact.isPrimary && <em>Primary</em>}</strong><small>{contact.role || "Client contact"}</small></div>
+            <div><strong>{contact.name}{contact.isPrimary && <Badge appearance="tint" color="brand">Primary</Badge>}</strong><small>{contact.role || "Client contact"}</small></div>
             <div className="crm-contact-links">
               {contact.email ? <a href={`mailto:${contact.email}`}><Mail />{contact.email}</a> : <span>Email not recorded</span>}
               {contact.phone ? <a href={`tel:${contact.phone}`}><Phone />{contact.phone}</a> : <span>Phone not recorded</span>}
@@ -3160,7 +3178,7 @@ function ClientContacts({
             </div>
           </article>
         ))}
-        {!contacts.length && <div className="crm-empty-state"><Users /><strong>No relationship contacts yet</strong><p>Add the person your practice works with most often.</p><button onClick={() => setAdding(true)}><Plus />Add first contact</button></div>}
+        {!contacts.length && <div className="crm-empty-state"><Users /><strong>No relationship contacts yet</strong><p>Add the person your practice works with most often.</p><Button appearance="primary" onClick={() => setAdding(true)}><Plus />Add first contact</Button></div>}
       </div>
     </section>
   );
@@ -3209,7 +3227,7 @@ function ClientActivity({
     <section className="panel crm-panel">
       <div className="panel-title crm-panel-title">
         <div><h2>Activity and follow-up</h2><p>A concise practice record of calls, meetings and relationship actions</p></div>
-        <button onClick={() => setAdding((open) => !open)} aria-expanded={adding}><Plus />Log activity</button>
+        <Button appearance="primary" onClick={() => setAdding((open) => !open)} aria-expanded={adding}><Plus />Log activity</Button>
       </div>
       {adding && (
         <form className="crm-quick-form" onSubmit={submit}>
@@ -3226,7 +3244,7 @@ function ClientActivity({
           </div>
           <p className="crm-form-guidance" id="crm-followup-guidance">To schedule a follow-up, enter both the next action and its follow-up date.</p>
           {formError && <p className="crm-form-error" role="alert">{formError}</p>}
-          <footer><button type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</button><button className="primary" type="submit"><Save />Save activity</button></footer>
+          <footer><Button appearance="secondary" type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</Button><Button appearance="primary" className="primary" type="submit"><Save />Save activity</Button></footer>
         </form>
       )}
       <div className="crm-timeline">
@@ -3246,7 +3264,7 @@ function ClientActivity({
             </article>
           );
         })}
-        {!activities.length && <div className="crm-empty-state"><Activity /><strong>No activity recorded</strong><p>Keep a light-touch history of relationship calls, meetings and follow-ups.</p><button onClick={() => setAdding(true)}><Plus />Log first activity</button></div>}
+        {!activities.length && <div className="crm-empty-state"><Activity /><strong>No activity recorded</strong><p>Keep a light-touch history of relationship calls, meetings and follow-ups.</p><Button appearance="primary" onClick={() => setAdding(true)}><Plus />Log first activity</Button></div>}
       </div>
     </section>
   );
@@ -3810,9 +3828,8 @@ function DialogView({
         )}
         {(dialog.kind === "engagement" || dialog.kind === "editEngagement") && (
           <>
-            <label>
-              Client
-              <select
+            <FluentField label="Client">
+              <FluentSelect
                 name="clientId"
                 defaultValue={eng?.clientId}
                 disabled={dialog.kind === "editEngagement"}
@@ -3822,8 +3839,8 @@ function DialogView({
                     {c.name}
                   </option>
                 ))}
-              </select>
-            </label>
+              </FluentSelect>
+            </FluentField>
             <Field
               n="periodStart"
               l="Period start"
@@ -3838,9 +3855,8 @@ function DialogView({
               v={eng?.periodEnd}
               required
             />
-            <label>
-              Charity law jurisdiction
-              <select name="jurisdiction" defaultValue={eng?.jurisdiction ?? "ENGLAND_WALES"} disabled={dialog.kind === "editEngagement"}>
+            <FluentField label="Charity law jurisdiction">
+              <FluentSelect name="jurisdiction" defaultValue={eng?.jurisdiction ?? "ENGLAND_WALES"} disabled={dialog.kind === "editEngagement"}>
                 {state.jurisdictions
                   .filter((item) => item.status === "ACTIVE")
                   .map((item) => (
@@ -3848,8 +3864,8 @@ function DialogView({
                       {item.name} · {item.regulator}
                     </option>
                   ))}
-              </select>
-            </label>
+              </FluentSelect>
+            </FluentField>
             <Select
               n="accountingBasis"
               l="Accounting basis"
@@ -3899,9 +3915,8 @@ function DialogView({
         )}
         {dialog.kind === "request" && (
           <>
-            <label>
-              Linked procedure
-              <select name="procedureId">
+            <FluentField label="Linked procedure">
+              <FluentSelect name="procedureId">
                 <option value="">Engagement level</option>
                 {state.tasks
                   .filter((t) => t.engagementId === active!.id)
@@ -3915,13 +3930,10 @@ function DialogView({
                         </option>
                       )),
                   )}
-              </select>
-            </label>
+              </FluentSelect>
+            </FluentField>
             <Field n="title" l="Request title" required />
-            <label>
-              Description
-              <textarea name="description" required />
-            </label>
+            <TextAreaField n="description" l="Description" required />
             <Field
               n="contactName"
               l="Client contact"
@@ -3948,14 +3960,7 @@ function DialogView({
               <span>{requestLinkage(state, req)}</span>
             </div>
             <Field n="title" l="Request title" v={req?.title} required />
-            <label>
-              Description
-              <textarea
-                name="description"
-                defaultValue={req?.description}
-                required
-              />
-            </label>
+            <TextAreaField n="description" l="Description" v={req?.description} required />
             <Field
               n="dueDate"
               l="Due date"
@@ -3980,13 +3985,7 @@ function DialogView({
               ))}
               {!thread.length && <p>No replies have been recorded.</p>}
             </div>
-            <label>
-              Reply to client
-              <textarea
-                name="reply"
-                placeholder="Write a secure reply to this request."
-              />
-            </label>
+            <TextAreaField n="reply" l="Reply to client" placeholder="Write a secure reply to this request." />
             <div className="dialog-documents">
               <h3>Client attachments</h3>
               {state.documents
@@ -4006,9 +4005,8 @@ function DialogView({
         )}
         {dialog.kind === "review" && (
           <>
-            <label>
-              Workpaper
-              <select name="taskId">
+            <FluentField label="Workpaper">
+              <FluentSelect name="taskId">
                 <option value="">Engagement level</option>
                 {state.tasks
                   .filter((t) => t.engagementId === active!.id)
@@ -4017,13 +4015,10 @@ function DialogView({
                       Task {t.direction}: {t.title}
                     </option>
                   ))}
-              </select>
-            </label>
+              </FluentSelect>
+            </FluentField>
             <Field n="title" l="Review point title" required />
-            <label>
-              Review point
-              <textarea name="body" required />
-            </label>
+            <TextAreaField n="body" l="Review point" required />
             <Select
               n="severity"
               l="Severity"
@@ -4033,14 +4028,7 @@ function DialogView({
           </>
         )}
         {dialog.kind === "clear" && (
-          <label>
-            Clearance response
-            <textarea
-              name="response"
-              required
-              placeholder="Record how the point was resolved and the evidence reviewed."
-            />
-          </label>
+          <TextAreaField n="response" l="Clearance response" required placeholder="Record how the point was resolved and the evidence reviewed." />
         )}
         {dialog.kind === "team" && (
           <>
@@ -4072,34 +4060,15 @@ function DialogView({
               l="Work programme phase"
               o={["Acceptance", "Planning", "Fieldwork", "Completion"]}
             />
-            <label>
-              Objective
-              <textarea name="objective" required />
-            </label>
-            <label>
-              Relevant guidance
-              <textarea
-                name="guidance"
-                required
-                placeholder="State the regulatory or practice guidance that applies."
-              />
-            </label>
-            <label>
-              Procedures, one per line
-              <textarea
-                name="procedures"
-                required
-                placeholder={
-                  "Obtain supporting evidence\nPerform the required check\nDocument the conclusion"
-                }
-              />
-            </label>
+            <TextAreaField n="objective" l="Objective" required />
+            <TextAreaField n="guidance" l="Relevant guidance" required placeholder="State the regulatory or practice guidance that applies." />
+            <TextAreaField n="procedures" l="Procedures, one per line" required placeholder={"Obtain supporting evidence\nPerform the required check\nDocument the conclusion"} />
           </>
         )}
-        <button className="primary">
+        <Button appearance="primary" className="primary" type="submit">
           <Check />
           Save record
-        </button>
+        </Button>
       </form>
     </Modal>
   );
@@ -4296,10 +4265,10 @@ function Side({
   click: () => void;
 }) {
   return (
-    <button className={active ? "active" : ""} onClick={click}>
+    <Button appearance="subtle" className={active ? "active" : ""} onClick={click}>
       {icon}
       <span>{text}</span>
-    </button>
+    </Button>
   );
 }
 function Modal({
@@ -4312,20 +4281,17 @@ function Modal({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(e) => e.currentTarget === e.target && close()}
-    >
-      <section className="modal-card" role="dialog" aria-modal="true">
+    <Dialog open modalType="modal" onOpenChange={(_, data) => { if (!data.open) close(); }}>
+      <DialogSurface className="modal-card" aria-label={title}>
         <header>
           <h2>{title}</h2>
-          <button aria-label="Close" onClick={close}>
+          <Button appearance="subtle" type="button" aria-label={`Close ${title}`} onClick={close}>
             <X />
-          </button>
+          </Button>
         </header>
         {children}
-      </section>
-    </div>
+      </DialogSurface>
+    </Dialog>
   );
 }
 function Float({
@@ -4338,15 +4304,17 @@ function Float({
   children: React.ReactNode;
 }) {
   return (
-    <aside className="floating-panel" onClick={(e) => e.stopPropagation()}>
+    <Dialog open modalType="non-modal" onOpenChange={(_, data) => { if (!data.open) close(); }}>
+      <DialogSurface className="floating-panel" aria-label={title}>
       <header>
         <strong>{title}</strong>
-        <button onClick={close}>
+        <Button appearance="subtle" type="button" aria-label={`Close ${title}`} onClick={close}>
           <X />
-        </button>
+        </Button>
       </header>
       {children}
-    </aside>
+      </DialogSurface>
+    </Dialog>
   );
 }
 function Field({
@@ -4358,15 +4326,39 @@ function Field({
 }: {
   n: string;
   l: string;
-  type?: string;
+  type?: "number" | "search" | "text" | "email" | "url" | "date" | "time" | "password" | "month" | "datetime-local" | "tel" | "week";
   required?: boolean;
   v?: string;
 }) {
   return (
-    <label>
-      {l}
-      <input name={n} type={type} required={required} defaultValue={v} />
-    </label>
+    <FluentField label={l} required={required}>
+      <FluentInput name={n} type={type} required={required} defaultValue={v} />
+    </FluentField>
+  );
+}
+function TextAreaField({
+  n,
+  l,
+  required = false,
+  v,
+  placeholder,
+}: {
+  n: string;
+  l: string;
+  required?: boolean;
+  v?: string;
+  placeholder?: string;
+}) {
+  return (
+    <FluentField label={l} required={required}>
+      <Textarea
+        name={n}
+        required={required}
+        defaultValue={v}
+        placeholder={placeholder}
+        resize="vertical"
+      />
+    </FluentField>
   );
 }
 function Select({
@@ -4381,16 +4373,15 @@ function Select({
   v?: string;
 }) {
   return (
-    <label>
-      {l}
-      <select name={n} defaultValue={v}>
+    <FluentField label={l}>
+      <FluentSelect name={n} defaultValue={v}>
         {o.map((x) => (
           <option value={x} key={x}>
             {x.includes(" ") || x.includes("(") ? x : label(x)}
           </option>
         ))}
-      </select>
-    </label>
+      </FluentSelect>
+    </FluentField>
   );
 }
 function EngSelect({
@@ -4403,16 +4394,15 @@ function EngSelect({
   change: (id: PublicId) => void;
 }) {
   return (
-    <label className="engagement-select">
-      Engagement
-      <select value={value} onChange={(e) => change(e.target.value)}>
+    <FluentField className="engagement-select" label="Engagement">
+      <FluentSelect value={value} onChange={(e) => change(e.target.value)}>
         {state.engagements.map((e) => (
           <option value={e.id} key={e.id}>
             {e.clientName} · {fmtDate(e.periodEnd)}
           </option>
         ))}
-      </select>
-    </label>
+      </FluentSelect>
+    </FluentField>
   );
 }
 function Page({
