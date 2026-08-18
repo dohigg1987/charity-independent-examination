@@ -25,6 +25,24 @@ function namedImports(sourceText: string, packageName: string) {
   return match[1];
 }
 
+function sourceSection(sourceText: string, start: string, end: string) {
+  const startIndex = sourceText.indexOf(start);
+  const endIndex = sourceText.indexOf(end, startIndex + start.length);
+  assert.notEqual(startIndex, -1, `missing source section start: ${start}`);
+  assert.notEqual(endIndex, -1, `missing source section end: ${end}`);
+  return sourceText.slice(startIndex, endIndex);
+}
+
+function fieldMarkup(sourceText: string, name: string) {
+  const nameIndex = sourceText.indexOf(`n="${name}"`);
+  assert.notEqual(nameIndex, -1, `missing ${name} field`);
+  const startIndex = sourceText.lastIndexOf("<Field", nameIndex);
+  const endIndex = sourceText.indexOf("/>", nameIndex);
+  assert.notEqual(startIndex, -1, `missing ${name} Field start`);
+  assert.notEqual(endIndex, -1, `missing ${name} Field end`);
+  return sourceText.slice(startIndex, endIndex + 2);
+}
+
 test("the application root supplies the Clarity Fluent 2 theme, including portals", () => {
   assert.match(
     packageJson.dependencies?.["@fluentui/react-components"] ?? "",
@@ -93,6 +111,50 @@ test("the client workspace has useful zero-data and filtered-empty states", () =
     workspace,
     /setClientQuery\(""\);\s*setClientStatus\("ALL"\);[\s\S]*Clear filters/,
   );
+});
+
+test("the client record dialog stays structured, conventional and optional-contact friendly", () => {
+  const clientDialog = sourceSection(
+    workspace,
+    "function ClientRecordDialog(",
+    "function GovernancePersonDialog(",
+  );
+
+  assert.match(
+    workspace,
+    /dialog\.kind === "client" \|\| dialog\.kind === "editClient"[\s\S]*<ClientRecordDialog/,
+    "client create and edit must use the dedicated dialog rather than the generic record form",
+  );
+  assert.match(clientDialog, /<Dialog\s+[\s\S]*?modalType="modal"/);
+  assert.match(
+    clientDialog,
+    /<DialogSurface\s+className="client-dialog-surface"\s+aria-label=\{title\}>/,
+  );
+  assert.match(clientDialog, /<form\s+className="client-dialog-form"\s+onSubmit=\{submit\}>/);
+  assert.match(clientDialog, /<DialogBody>/);
+  assert.match(clientDialog, /<DialogTitle[\s\S]*?action=\{[\s\S]*?Close \$\{title\}[\s\S]*?<\/DialogTitle>/);
+  assert.match(clientDialog, /<DialogContent\s+className="client-dialog-content">/);
+  assert.match(clientDialog, /<div\s+className="client-dialog-grid">/);
+  assert.match(
+    clientDialog,
+    /<Select\s+[\s\S]*?className="client-dialog-wide"[\s\S]*?n="legalForm"/,
+    "the longer organisation field must retain its full-width layout hook",
+  );
+
+  const contactName = fieldMarkup(clientDialog, "contactName");
+  assert.match(contactName, /l="Primary contact \(optional\)"/);
+  assert.doesNotMatch(contactName, /\brequired\b/);
+  const contactEmail = fieldMarkup(clientDialog, "contactEmail");
+  assert.match(contactEmail, /l="Contact email \(optional\)"/);
+  assert.match(contactEmail, /type="email"/);
+  assert.doesNotMatch(contactEmail, /\brequired\b/);
+
+  assert.match(
+    clientDialog,
+    /<DialogActions>[\s\S]*?<Button\s+appearance="secondary"\s+type="button"\s+onClick=\{close\}>[\s\S]*?Cancel[\s\S]*?<Button\s+appearance="primary"\s+type="submit">[\s\S]*?Create client[\s\S]*?<\/DialogActions>/,
+    "Cancel must precede the primary submit action in the dialog footer",
+  );
+  assert.doesNotMatch(clientDialog, /className="modal-form"/);
 });
 
 test("communications creation remains a native submit flow on both sides", () => {
