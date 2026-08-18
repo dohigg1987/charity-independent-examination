@@ -52,7 +52,9 @@ test("core operational controls use official Fluent dialogs, fields and tabs", (
   for (const component of [
     "Button",
     "Dialog",
+    "DialogActions",
     "DialogSurface",
+    "DialogTitle",
     "Field as FluentField",
     "Input as FluentInput",
     "Select as FluentSelect",
@@ -64,11 +66,33 @@ test("core operational controls use official Fluent dialogs, fields and tabs", (
 
   assert.match(workspace, /<Dialog\s+open\s+modalType="modal"/);
   assert.match(workspace, /<DialogSurface\b[^>]*aria-label=\{title\}/);
+  assert.match(workspace, /<DialogTitle\s+as="h2">\{title\}<\/DialogTitle>/);
+  assert.match(
+    workspace,
+    /<DialogActions[^>]*>[\s\S]*type="submit"[\s\S]*<\/DialogActions>/,
+  );
   assert.match(workspace, /<FluentField\s+label=\{l\}/);
   assert.match(workspace, /<FluentInput\s+name=\{n\}/);
   assert.match(workspace, /<FluentSelect\s+name=\{n\}/);
   assert.match(workspace, /<TabList\b[^>]*aria-label="Client record sections"/);
   assert.match(workspace, /<Tab\s+value="overview"/);
+});
+
+test("the client workspace has useful zero-data and filtered-empty states", () => {
+  assert.match(workspace, /!state\.clients\.length\s*\?\s*\(/);
+  assert.match(
+    workspace,
+    /aria-labelledby="clients-empty-title"[\s\S]*id="clients-empty-title">Add your first client/,
+  );
+  assert.match(
+    workspace,
+    /<Button\s+appearance="primary"\s+onClick=\{create\}>[\s\S]*Add first client/,
+  );
+  assert.match(workspace, /No clients match this search and status filter/);
+  assert.match(
+    workspace,
+    /setClientQuery\(""\);\s*setClientStatus\("ALL"\);[\s\S]*Clear filters/,
+  );
 });
 
 test("communications creation remains a native submit flow on both sides", () => {

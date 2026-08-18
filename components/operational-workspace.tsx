@@ -8,7 +8,9 @@ import {
   Card,
   Checkbox,
   Dialog,
+  DialogActions,
   DialogSurface,
+  DialogTitle,
   Field as FluentField,
   Input as FluentInput,
   SearchBox,
@@ -2792,6 +2794,24 @@ function Clients({
         </div>
       }
     >
+      {!state.clients.length ? (
+        <Card
+          className="panel crm-empty-state"
+          role="region"
+          aria-labelledby="clients-empty-title"
+        >
+          <Building2 />
+          <strong id="clients-empty-title">Add your first client</strong>
+          <p>
+            Create the permanent client record first. You can then open a
+            separate annual working-paper file for each reporting period.
+          </p>
+          <Button appearance="primary" onClick={create}>
+            <Plus />
+            Add first client
+          </Button>
+        </Card>
+      ) : (
       <div className="client-master-detail">
         <div className="panel">
           <div className="client-list-toolbar">
@@ -2857,7 +2877,18 @@ function Clients({
           })}
           {!visibleClients.length && (
             <div role="row">
-              <p className="client-list-empty" role="gridcell">No clients match this view.</p>
+              <div className="client-list-empty" role="gridcell">
+                <p>No clients match this search and status filter.</p>
+                <Button
+                  appearance="subtle"
+                  onClick={() => {
+                    setClientQuery("");
+                    setClientStatus("ALL");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </div>
             </div>
           )}
           </div>
@@ -3160,6 +3191,7 @@ function Clients({
           </section>
         )}
       </div>
+      )}
     </Page>
   );
 }
@@ -4191,10 +4223,19 @@ function DialogView({
             <TextAreaField n="procedures" l="Procedures, one per line" required placeholder={"Obtain supporting evidence\nPerform the required check\nDocument the conclusion"} />
           </>
         )}
-        <Button appearance="primary" className="primary" type="submit">
-          <Check />
-          Save record
-        </Button>
+        <DialogActions style={{ gridColumn: "1 / -1" }}>
+          <Button appearance="secondary" type="button" onClick={close}>
+            Cancel
+          </Button>
+          <Button appearance="primary" className="primary" type="submit">
+            <Check />
+            {dialog.kind === "client"
+              ? "Create client"
+              : dialog.kind === "editClient"
+                ? "Save changes"
+                : "Save record"}
+          </Button>
+        </DialogActions>
       </form>
     </Modal>
   );
@@ -4275,10 +4316,12 @@ function GovernancePersonDialog({
           A cessation date is mandatory where the person is no longer active.
           Historical records remain in the permanent governance register.
         </p>
-        <button className="primary">
-          <Check />
-          Save governance record
-        </button>
+        <DialogActions style={{ gridColumn: "1 / -1" }}>
+          <Button appearance="primary" className="primary" type="submit">
+            <Check />
+            Save governance record
+          </Button>
+        </DialogActions>
       </form>
     </Modal>
   );
@@ -4410,7 +4453,7 @@ function Modal({
     <Dialog open modalType="modal" onOpenChange={(_, data) => { if (!data.open) close(); }}>
       <DialogSurface className="modal-card" aria-label={title}>
         <header>
-          <h2>{title}</h2>
+          <DialogTitle as="h2">{title}</DialogTitle>
           <Button appearance="subtle" type="button" aria-label={`Close ${title}`} onClick={close}>
             <X />
           </Button>
@@ -4433,7 +4476,7 @@ function Float({
     <Dialog open modalType="non-modal" onOpenChange={(_, data) => { if (!data.open) close(); }}>
       <DialogSurface className="floating-panel" aria-label={title}>
       <header>
-        <strong>{title}</strong>
+        <DialogTitle as="h2">{title}</DialogTitle>
         <Button appearance="subtle" type="button" aria-label={`Close ${title}`} onClick={close}>
           <X />
         </Button>
