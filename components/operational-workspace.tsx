@@ -966,6 +966,37 @@ function EngagementView({
         </div>
         <span className="risk-chip">{label(engagement.risk)} risk</span>
       </div>
+      <section className="engagement-phase-strip" aria-label="Engagement progress">
+        {["ACCEPTANCE", "PLANNING", "FIELDWORK", "COMPLETION"].map(
+          (phase, index) => {
+            const phaseTasks = tasks.filter(
+              (item) => item.phase.toUpperCase() === phase,
+            );
+            const complete = phaseTasks.filter(
+              (item) => item.status === "REVIEWED",
+            ).length;
+            const active = phaseTasks.some(
+              (item) => item.id === task.id || item.status === "IN_PROGRESS",
+            );
+            return (
+              <div
+                className={`${complete === phaseTasks.length && phaseTasks.length ? "complete" : ""} ${active ? "active" : ""}`}
+                key={phase}
+              >
+                <span>{complete === phaseTasks.length && phaseTasks.length ? <Check /> : index + 1}</span>
+                <p>
+                  <strong>{phase[0] + phase.slice(1).toLowerCase()}</strong>
+                  <small>
+                    {phaseTasks.length
+                      ? `${complete} of ${phaseTasks.length} reviewed`
+                      : "No tasks yet"}
+                  </small>
+                </p>
+              </div>
+            );
+          },
+        )}
+      </section>
       <div className="accordion-layout">
         <section className="workpaper-accordions">
           <AnnualFileSection
@@ -1423,7 +1454,7 @@ function AnnualFileSection({
     },
   ];
   return (
-    <>
+    <div className="annual-file-section">
       <ScopeSection
         state={state}
         engagement={engagement}
@@ -1504,7 +1535,7 @@ function AnnualFileSection({
           })}
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -2665,8 +2696,19 @@ function Clients({
   notify: Notify;
   openAnnual: (id: PublicId) => void;
 }) {
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientStatus, setClientStatus] = useState("ALL");
   const client =
     state.clients.find((c) => c.id === selectedId) ?? state.clients[0];
+  const visibleClients = state.clients.filter((candidate) => {
+    const matchesQuery = `${candidate.name} ${candidate.charityNumber}`
+      .toLowerCase()
+      .includes(clientQuery.trim().toLowerCase());
+    return (
+      matchesQuery &&
+      (clientStatus === "ALL" || candidate.status === clientStatus)
+    );
+  });
   const contacts = client
     ? state.clientContacts
         .filter((contact) => contact.clientId === client.id)
@@ -2720,30 +2762,87 @@ function Clients({
       title="Clients"
       desc="Permanent client records and distinct annual working-paper files."
       action={
-        <Button appearance="primary" className="primary" onClick={create}>
-          <Plus />
-          New client
-        </Button>
+        <div className="page-actions">
+          {client && (
+            <Button
+              appearance="secondary"
+              className="secondary"
+              onClick={() => selectSection("activity")}
+            >
+              <Activity />
+              Log activity
+            </Button>
+          )}
+          <Button appearance="primary" className="primary" onClick={create}>
+            <Plus />
+            New client
+          </Button>
+        </div>
       }
     >
       <div className="client-master-detail">
         <div className="client-list panel">
-          {state.clients.map((c) => (
+          <div className="client-list-toolbar">
+            <SearchBox
+              aria-label="Find client"
+              placeholder="Find client"
+              value={clientQuery}
+              onChange={(_, data) => setClientQuery(data.value)}
+            />
+            <FluentSelect
+              aria-label="Filter clients by status"
+              value={clientStatus}
+              onChange={(event) => setClientStatus(event.target.value)}
+            >
+              <option value="ALL">All statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </FluentSelect>
+          </div>
+          <div className="client-grid-head" aria-hidden="true">
+            <span>Client</span>
+            <span>Status</span>
+            <span>Next action</span>
+            <span>Year end</span>
+          </div>
+          {visibleClients.map((c) => {
+            const nextAction = state.clientActivities
+              .filter(
+                (item) =>
+                  item.clientId === c.id &&
+                  item.followUpDate &&
+                  !item.completedAt,
+              )
+              .sort((a, b) =>
+                a.followUpDate!.localeCompare(b.followUpDate!),
+              )[0];
+            const latestFile = state.engagements
+              .filter((item) => item.clientId === c.id)
+              .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+            return (
             <button
               className={c.id === client?.id ? "active" : ""}
               key={c.id}
               onClick={() => selectClient(c.id)}
             >
-              <span className="charity-logo willow">{c.name[0]}</span>
-              <span>
-                <strong>{c.name}</strong>
-                <small>
-                  {c.charityNumber} · {c.legalForm}
-                </small>
+              <span className="client-grid-name">
+                <span className="charity-logo willow">{c.name[0]}</span>
+                <span>
+                  <strong>{c.name}</strong>
+                  <small>{c.charityNumber}</small>
+                </span>
               </span>
-              <ChevronRight />
+              <span><Status s={c.status} /></span>
+              <span className="client-grid-action">
+                {nextAction?.nextAction || nextAction?.subject || "—"}
+              </span>
+              <span>{latestFile ? fmtDate(latestFile.periodEnd) : "—"}</span>
             </button>
-          ))}
+            );
+          })}
+          {!visibleClients.length && (
+            <p className="client-list-empty">No clients match this view.</p>
+          )}
         </div>
         {client && (
           <section className="client-profile">
@@ -2778,7 +2877,6 @@ function Clients({
               </dl>
             </div>
             <TabList
-              vertical
               className="client-file-tabs"
               aria-label="Client record sections"
               selectedValue={section}
