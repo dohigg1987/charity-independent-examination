@@ -443,3 +443,111 @@ button,input,select,textarea{font:inherit}
 
 /* Keep relationship-support text at an accessible working size. */
 .client-file-tabs strong{font-size:13px}.client-file-tabs small,.crm-key-contact small,.crm-file-summary>small,.crm-followup-preview>span:last-child small,.client-record-strip small,.crm-form-heading small,.crm-contact-row>div>small,.crm-contact-links a,.crm-contact-links span,.crm-empty-state p,.crm-timeline-body header small,.crm-timeline-body>p{font-size:11px}.crm-summary-card header p,.crm-date-tile small,.crm-contact-row>div>strong em,.crm-followup small{font-size:10px}.crm-summary-card h2{font-size:16px}.crm-key-contact strong,.crm-file-summary>strong,.crm-empty-state strong,.crm-form-heading strong,.crm-contact-row>div>strong,.crm-timeline-body header strong{font-size:13px}.crm-empty-copy,.crm-form-grid label,.crm-check{font-size:12px}.crm-form-grid input,.crm-form-grid select,.crm-form-grid textarea{font-size:13px}.crm-panel-title>button,.crm-empty-state>button,.crm-row-actions .secondary,.crm-followup .secondary{font-size:11px}.crm-followup-preview>span:last-child strong,.crm-followup strong{font-size:11px}.crm-form-guidance,.crm-form-error{font-size:11px}
+
+/* Fluent 2 workspace fidelity. This final layer intentionally follows the
+   earlier client explorer: pale navigation, a Clarity command header, quiet
+   data surfaces and compact, labelled controls. */
+:root{
+  --ink:#242424;--muted:#616161;--line:#d1d1d1;--soft:#f5f5f5;
+  --app-bg:#f5f5f5;--surface:#fff;--text:#242424;--text-muted:#616161;
+  --border:#d1d1d1;--radius-sm:4px;--radius-md:6px;--radius-lg:8px;
+  --shadow-xs:0 1px 2px rgba(0,0,0,.06);--shadow-sm:0 2px 6px rgba(0,0,0,.09);
+}
+html,body,.clarity-fluent-provider{background:#f5f5f5;color:#242424;font-family:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;font-size:14px}
+.app-shell{grid-template-columns:228px minmax(0,1fr);background:#f5f5f5}
+.sidebar{width:228px;padding:12px 8px 14px;border-right:1px solid #e0e0e0;background:#fafafa;color:#242424;box-shadow:none}
+.logo-inverse{height:48px;margin:2px 8px 8px;background:url('/clarity-ie-logo.svg') left center/172px auto no-repeat}
+.logo-inverse .brand-logo-image{width:172px;opacity:0}
+.organisation-switch{min-height:52px;padding:7px 8px;border:1px solid #d1d1d1;border-radius:4px;background:#fff;color:#242424;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.organisation-switch:hover{border-color:#b3b3b3;background:#f5f5f5}
+.organisation-switch small,.user-card small{color:#616161;font-size:11px}
+.organisation-switch span:nth-child(2){font-size:13px;font-weight:500}
+.org-avatar,.avatar{background:#dff4f2;color:#005e5e;font-weight:600}
+.sidebar nav{margin-top:10px}
+.nav-label{margin:15px 10px 5px;color:#707070;font-size:10px;font-weight:600;letter-spacing:.04em}
+.nav-label.lower{margin-top:18px}
+.sidebar nav button{min-height:38px;margin:1px 0;padding:0 10px;border-radius:4px;color:#424242;font-size:13px;font-weight:400;gap:11px}
+.sidebar nav button svg{width:19px;height:19px;color:#616161;stroke-width:1.75}
+.sidebar nav button:hover{background:#f0f0f0;color:#242424}
+.sidebar nav button.active{background:#e1f3f1;color:#005e5e;box-shadow:inset 3px 0 0 #e66a35;font-weight:600}
+.sidebar nav button.active svg{color:#007c7c}
+.sidebar nav button b{background:#c50f1f;font-size:10px;font-weight:600}
+.sidebar-foot{margin:8px 4px 10px;padding:9px;border:1px solid #c9e1df;border-radius:4px;background:#f0f8f7;color:#007c7c}
+.sidebar-foot strong{color:#242424;font-size:11px;font-weight:600}.sidebar-foot small{color:#616161;font-size:10px}
+.user-card{min-height:49px;padding:10px 5px 0;border-top:1px solid #e0e0e0;color:#242424}.user-card strong{color:#242424;font-size:12px;font-weight:600}.user-card>svg{color:#616161}
+.main{grid-column:2;background:#f5f5f5}
+.topbar{height:52px;padding:0 14px;border-bottom:0;background:#007c7c;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.16);backdrop-filter:none}
+.topbar .search{width:min(520px,52vw);min-height:34px;padding:0;border:0;border-radius:4px;background:rgba(255,255,255,.98);color:#424242;box-shadow:none}
+.topbar .search:focus-within{border:0;box-shadow:0 0 0 2px rgba(255,255,255,.55)}
+.workspace-searchbox{width:100%;min-height:34px;border:0!important;background:transparent!important}
+.topbar .search input{font-size:13px}.topbar .search kbd{margin-right:8px;background:#f0f0f0;color:#616161;font-size:10px}
+.top-actions{gap:3px}.top-actions>button{min-width:36px;min-height:36px;color:#fff}.top-actions>button:hover{background:rgba(255,255,255,.14);color:#fff}
+.notification i{border-color:#007c7c}.portal-link{min-height:34px;padding:0 10px;border:1px solid rgba(255,255,255,.3);border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:500}.portal-link:hover{background:rgba(255,255,255,.18)}
+.breadcrumbs{top:52px;min-height:36px;padding:0 24px;border-bottom:1px solid #e0e0e0;background:#fafafa}.breadcrumbs button,.breadcrumbs strong{font-size:11px}.breadcrumbs button{color:#616161}.breadcrumbs strong{color:#242424;font-weight:500}
+.page{max-width:1600px;padding:26px 28px 56px}.page-heading{align-items:flex-start;margin-bottom:20px}.page-heading h1{color:#242424;font:500 28px/36px var(--font-primary);letter-spacing:-.3px}.page-heading>div>p:last-child{margin-top:2px;color:#616161;font-size:13px;line-height:20px}.eyebrow{display:none}
+.primary,.secondary{min-height:36px;padding:6px 12px;border-radius:4px;font-size:13px;font-weight:500;box-shadow:none;transform:none}.primary{border-color:#007c7c;background:#007c7c}.primary:hover{border-color:#006d6d;background:#006d6d;box-shadow:none;transform:none}.secondary{border-color:#d1d1d1;background:#fff;color:#242424}.secondary:hover{border-color:#b3b3b3;background:#f5f5f5}
+.primary svg,.secondary svg{width:16px;height:16px}
+.panel,.stat-grid article,.request-card,.portal-side-card,.admin-shell,.team-member-card{border:1px solid #d1d1d1;border-radius:6px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.panel-title{min-height:60px;padding:14px 16px;border-color:#e0e0e0}.panel-title h2{color:#242424;font:500 16px/22px var(--font-primary)}.panel-title p{margin-top:2px;color:#616161;font-size:12px}
+.table-head,.request-head{padding:10px 14px;background:#fafafa;color:#424242;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none}.engagement-row{padding:12px 14px;border-color:#e0e0e0;font-size:12px}.engagement-row:hover{background:#f0f8f7;box-shadow:inset 3px 0 #1a8a7c}
+
+/* Client list/detail mirrors the earlier split Fluent data-grid prototype. */
+.client-master-detail{grid-template-columns:minmax(300px,36%) minmax(520px,1fr);gap:16px;align-items:start}
+.client-list{overflow:hidden;border-radius:6px}.client-list:before{display:block;padding:13px 14px;border-bottom:1px solid #e0e0e0;background:#fff;color:#242424;font-size:16px;font-weight:500;content:"Client list"}
+.client-list>button{min-height:66px;grid-template-columns:36px minmax(0,1fr) 20px;padding:11px 13px;border-bottom:1px solid #e0e0e0;background:#fff}
+.client-list>button:last-child{border-bottom:0}.client-list>button:hover{background:#f5f5f5}.client-list>button.active{background:#e2f4f1;box-shadow:inset 3px 0 #1a8a7c}
+.client-list .charity-logo{width:36px;height:36px;border-radius:50%;background:#dff4f2;color:#005e5e;box-shadow:none;font-size:13px}
+.client-list strong{color:#242424;font-size:13px;font-weight:600}.client-list small{margin-top:3px;color:#616161;font-size:11px}.client-list svg{color:#616161}
+.client-profile{gap:12px}.profile-summary{padding:18px 20px}.profile-summary h2{color:#242424;font-size:20px;font-weight:500}.profile-summary p{color:#616161;font-size:12px}.profile-summary .charity-logo.big{width:46px;height:46px;border-radius:6px;background:#007c7c;font-size:19px}.profile-summary>button{margin-top:-42px}.profile-summary dl{gap:0;margin:18px -20px -18px;border-top:1px solid #e0e0e0}.profile-summary dl div{padding:12px 16px;border-top:0;border-left:1px solid #e0e0e0}.profile-summary dl div:first-child{border-left:0}.profile-summary dt{color:#616161;font-size:11px}.profile-summary dd{margin-top:3px;color:#242424;font-size:12px;font-weight:600}
+.client-file-tabs{display:flex;grid-template-columns:none;gap:0;padding:0;overflow-x:auto;border:1px solid #d1d1d1;border-radius:6px;background:#fff;box-shadow:none}
+.client-file-tabs button{display:flex;min-width:max-content;min-height:44px;flex:1;grid-template-columns:none;align-items:center;gap:7px;padding:8px 12px;border:0;border-bottom:3px solid transparent;border-radius:0;background:#fff;color:#424242}
+.client-file-tabs button:hover{background:#f5f5f5}.client-file-tabs button.active{border:0;border-bottom:3px solid #1a8a7c;border-radius:0;background:#fff;color:#006d6d;box-shadow:none}.client-file-tabs button.active:after{display:none}
+.client-file-tabs svg{width:16px;height:16px;color:#616161}.client-file-tabs button.active svg{color:#007c7c}.client-file-tabs strong{font-size:12px;font-weight:500}.client-file-tabs small{display:none}
+.client-overview-grid{gap:12px}.crm-summary-card{min-height:190px;padding:16px;border-radius:6px}.crm-summary-card:before{height:2px;background:#1a8a7c}.crm-summary-card>header{margin-bottom:14px}.crm-summary-card header p{color:#616161;font-size:10px;font-weight:600;letter-spacing:.04em}.crm-summary-card h2{font-size:16px;font-weight:500}.crm-summary-card header>b{border-radius:10px;background:#fff4ce;color:#8a4b08}.crm-icon{width:32px;height:32px;border-radius:4px;background:#e2f4f1;color:#006d6d}.crm-icon svg{width:17px}.crm-card-action{border-color:#d1d1d1;border-radius:4px}
+.client-record-strip>span{padding:12px 14px;border-color:#e0e0e0}.client-record-strip small{font-size:11px}.client-record-strip strong{font-size:16px;font-weight:500}
+.crm-panel-title>button,.crm-empty-state>button{border-color:#d1d1d1;border-radius:4px;color:#006d6d;font-size:12px;font-weight:500}.crm-panel-title>button:hover,.crm-empty-state>button:hover{background:#f0f8f7}
+.crm-contact-row{padding:13px 16px;border-color:#e0e0e0}.crm-contact-row:hover{background:#f5f5f5}.crm-contact-row>div>strong{font-weight:600}.crm-contact-row>div>strong em{border-radius:10px}.crm-quick-form{border-color:#c9e1df;border-radius:6px;background:#f7fbfb;box-shadow:inset 3px 0 #1a8a7c}.crm-form-grid input,.crm-form-grid select,.crm-form-grid textarea{border:1px solid #b3b3b3;border-radius:4px}.crm-form-grid input:focus,.crm-form-grid select:focus,.crm-form-grid textarea:focus{border-color:#007c7c;outline:1px solid #007c7c}
+
+@media(max-width:1100px){.app-shell{grid-template-columns:216px minmax(0,1fr)}.sidebar{width:216px}.client-master-detail{grid-template-columns:280px minmax(0,1fr)}.client-overview-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.client-master-detail{grid-template-columns:1fr}.client-list{display:grid;grid-template-columns:1fr 1fr}.client-list:before{grid-column:1/-1}.client-profile{min-width:0}}
+@media(max-width:760px){.app-shell{display:block}.main{grid-column:auto}.sidebar.mobile-open{width:min(300px,88vw);background:#fafafa}.topbar{height:52px;padding:0 10px}.topbar .search{width:100%}.breadcrumbs{top:52px}.page{padding:20px 14px 44px}.page-heading{display:grid;gap:12px}.client-file-tabs button{flex:0 0 auto}.portal-link{font-size:0}.portal-link svg{margin:0}}
+@media(max-width:560px){.client-list{grid-template-columns:1fr}.client-master-detail{display:block}.client-profile{margin-top:12px}.profile-summary>button{float:none;margin:14px 0 0}.profile-summary dl{grid-template-columns:1fr;margin:16px 0 0}.profile-summary dl div{padding:10px 0;border-top:1px solid #e0e0e0;border-left:0}.client-overview-grid{grid-template-columns:1fr}.client-record-strip{grid-template-columns:1fr 1fr}.page-heading>.primary{width:100%}}
+
+/* Earlier Clarity Fluent explorer composition: dense client grid and a
+   work-programme-led engagement canvas. */
+.app-shell{padding-top:64px;grid-template-columns:232px minmax(0,1fr)}
+.sidebar{inset:64px auto 0 0;width:232px;min-height:calc(100dvh - 64px);padding:20px 12px;background:#203845;color:#eef7f7;border-right:0}
+.logo-inverse{display:none}.organisation-switch{border-color:rgba(185,208,212,.22);background:transparent;color:#eef7f7}.organisation-switch:hover{border-color:rgba(185,208,212,.38);background:rgba(102,204,204,.08)}.organisation-switch small,.user-card small,.nav-label{color:#a7c0c5}.organisation-switch span:nth-child(2),.user-card,.user-card strong{color:#eef7f7}.sidebar nav button{color:#eaf5f5}.sidebar nav button svg{color:#9cd5d0}.sidebar nav button:hover{background:rgba(102,204,204,.12);color:#fff}.sidebar nav button.active{background:rgba(46,196,182,.18);color:#fff;box-shadow:inset 3px 0 0 #e66a35}.sidebar nav button.active:before{display:none}.sidebar-foot{border-color:rgba(102,204,182,.25);background:rgba(46,196,182,.08);color:#eef7f7}.sidebar-foot strong{color:#eef7f7}.sidebar-foot small{color:#b9d0d4}.user-card{border-color:rgba(255,255,255,.12)}
+.topbar{position:fixed;z-index:45;top:0;right:0;left:0;display:grid;grid-template-columns:216px minmax(240px,560px) 1fr;gap:24px;height:64px;padding:8px 24px;border-bottom:1px solid #d7e4e4;background:#fff;color:#203845;box-shadow:none}
+.topbar:before{display:block;width:176px;height:48px;background:url('/clarity-ie-logo.svg') left center/176px auto no-repeat;content:""}.topbar .mobile-menu-button{display:none}.topbar .search{grid-column:2;width:100%;min-height:40px;border:1px solid #b7c9cc;background:#fff}.topbar .search:focus-within{border:1px solid #00796f;box-shadow:0 0 0 1px #00796f}.top-actions{grid-column:3;justify-self:end}.top-actions>button{color:#203845}.top-actions>button:hover{background:#eef6f5;color:#00796f}.notification i{border-color:#fff}.portal-link{border-color:#b7c9cc;background:#fff;color:#00796f}.portal-link:hover{border-color:#00796f;background:#eef8f7}.main{grid-column:2}.breadcrumbs{top:0}
+.page-actions{display:flex;align-items:center;gap:8px}
+.client-master-detail{grid-template-columns:minmax(480px,.95fr) minmax(420px,1.05fr);gap:16px}
+.client-list:before{display:none}
+.client-list-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;padding:12px;border-bottom:1px solid #e0e0e0;background:#fff}
+.client-list-toolbar [role=searchbox],.client-list-toolbar select{min-height:34px}
+.client-grid-head,.client-list>button{display:grid;grid-template-columns:minmax(190px,1.25fr) 82px minmax(120px,.85fr) 88px;gap:10px;align-items:center}
+.client-grid-head{padding:9px 12px;border-bottom:1px solid #e0e0e0;background:#fafafa;color:#616161;font-size:11px;font-weight:600}
+.client-list>button{width:100%;min-height:62px;padding:9px 12px;text-align:left}
+.client-grid-name{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:center;min-width:0}
+.client-grid-name>span:last-child{display:grid;min-width:0}.client-grid-name strong,.client-grid-name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-grid-action{overflow:hidden;color:#424242;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+.client-list>button>span:last-child{color:#616161;font-size:11px}
+.client-list-empty{margin:0;padding:26px 16px;color:#616161;text-align:center}
+.client-overview-grid{grid-template-areas:"relationship action" "annual annual" "record record";grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.client-overview-grid>.crm-summary-card:nth-child(1){grid-area:relationship}
+.client-overview-grid>.crm-summary-card:nth-child(2){grid-area:annual;min-height:0}
+.client-overview-grid>.crm-summary-card:nth-child(3){grid-area:action;border-color:#f0cdb9;background:#fff6f0;box-shadow:inset 3px 0 #e66a35}
+.client-overview-grid>.crm-summary-card:nth-child(3):before{display:none}
+.client-overview-grid>.client-record-strip{grid-area:record}
+.engagement-phase-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 24px 16px;border:1px solid #d1d1d1;border-radius:6px;background:#fff;overflow:hidden}
+.engagement-phase-strip>div{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:center;min-height:64px;padding:10px 14px;border-left:1px solid #e0e0e0}
+.engagement-phase-strip>div:first-child{border-left:0}.engagement-phase-strip>div>span{display:grid;width:26px;height:26px;place-items:center;border:1px solid #b3b3b3;border-radius:50%;color:#616161;font-size:11px;font-weight:600}.engagement-phase-strip>div>span svg{width:14px}.engagement-phase-strip p,.engagement-phase-strip strong,.engagement-phase-strip small{display:block;margin:0}.engagement-phase-strip strong{font-size:12px;font-weight:600}.engagement-phase-strip small{margin-top:2px;color:#616161;font-size:10px}.engagement-phase-strip>div.complete>span{border-color:#1a8a7c;background:#1a8a7c;color:#fff}.engagement-phase-strip>div.active{background:#f0f8f7;box-shadow:inset 0 -3px #1a8a7c}
+.accordion-layout{display:grid;grid-template-columns:minmax(300px,.78fr) minmax(520px,1.22fr);gap:16px;align-items:start;padding:0 24px 28px}
+.workpaper-accordions{display:grid;grid-column:1/-1;grid-template-columns:minmax(300px,.78fr) minmax(520px,1.22fr);gap:0 16px;align-items:start}
+.workpaper-accordions>.annual-file-section{grid-column:1}
+.wp-accordion{display:contents}.wp-accordion-head{grid-column:1}.wp-accordion-body{grid-column:2;grid-row:1/span 30;border:1px solid #d1d1d1;border-radius:6px;background:#fff;overflow:hidden}
+.accordion-layout>.activity{grid-column:2;margin-top:12px}
+@media(max-width:1200px){.client-master-detail{grid-template-columns:minmax(380px,.9fr) minmax(400px,1.1fr)}.client-grid-head,.client-list>button{grid-template-columns:minmax(170px,1fr) 76px 92px}.client-grid-head>span:last-child,.client-list>button>span:last-child{display:none}.workpaper-accordions,.accordion-layout{grid-template-columns:minmax(280px,.75fr) minmax(440px,1.25fr)}}
+@media(max-width:1000px){.client-master-detail{grid-template-columns:1fr}.engagement-phase-strip{grid-template-columns:1fr 1fr}.engagement-phase-strip>div:nth-child(3){border-top:1px solid #e0e0e0;border-left:0}.engagement-phase-strip>div:nth-child(4){border-top:1px solid #e0e0e0}.workpaper-accordions,.accordion-layout{display:block}.wp-accordion{display:block}.wp-accordion-body{margin-bottom:12px}.accordion-layout>.activity{margin-top:16px}}
+@media(max-width:760px){.app-shell{padding-top:104px}.topbar{grid-template-columns:auto minmax(0,1fr) auto;gap:10px;height:104px;padding:8px 14px}.topbar:before{grid-column:2;width:132px;height:40px;background-size:132px auto}.topbar .mobile-menu-button{display:inline-flex;grid-column:1;grid-row:1}.topbar .search{grid-column:1/-1;grid-row:2}.top-actions{grid-column:3;grid-row:1}.sidebar.mobile-open{inset:104px auto 0 0;background:#203845}.breadcrumbs{top:0}}
+@media(max-width:640px){.page-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.client-list-toolbar{grid-template-columns:1fr}.client-grid-head{display:none}.client-list>button{grid-template-columns:minmax(0,1fr) auto}.client-list>button>span:nth-child(n+3){display:none}.client-overview-grid{display:grid;grid-template-areas:"relationship" "action" "annual" "record";grid-template-columns:1fr}.engagement-phase-strip{margin-inline:14px}.accordion-layout{padding-inline:14px}}
