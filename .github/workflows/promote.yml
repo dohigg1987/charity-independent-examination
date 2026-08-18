@@ -91,6 +91,7 @@ jobs:
           NEW_VERSION: ${{ steps.upload.outputs.version_id }}
           PREVIOUS_VERSION: ${{ steps.previous.outputs.version_id }}
           TARGET_ENV: ${{ inputs.target }}
+          COMMIT_SHA: ${{ inputs.commit }}
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -99,8 +100,38 @@ jobs:
           trap rollback ERR
           if [[ "$TARGET_ENV" == production && -n "$PREVIOUS_VERSION" ]]; then npx wrangler versions deploy "${NEW_VERSION}@10" "${PREVIOUS_VERSION}@90" --config "$config" --message "Production canary" --yes; sleep 30; fi
           npx wrangler versions deploy "${NEW_VERSION}@100" --config "$config" --message "Assured ${TARGET_ENV} release" --yes
-          for attempt in 1 2 3 4 5; do status=$(curl -sS -o health.json -w '%{http_code}' "$PUBLIC_SITE_URL/api/health" || true); [[ "$status" == 200 ]] && jq -e --arg version "$NEW_VERSION" '.status == "ok" and .version == $version and .checks.database and .checks.objectStorage' health.json && break; sleep 5; done
-          jq -e --arg version "$NEW_VERSION" '.status == "ok" and .version == $version' health.json
+
+          if [[ "$TARGET_ENV" == production ]]; then
+            propagation_grace=30
+            max_attempts=18
+            retry_delay=10
+          else
+            propagation_grace=5
+            max_attempts=12
+            retry_delay=5
+          fi
+          sleep "$propagation_grace"
+
+          assured=false
+          for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+            probe="${NEW_VERSION}-${attempt}-$(date +%s%N)"
+            health_url="${PUBLIC_SITE_URL%/}/api/health?assurance_probe=${probe}"
+            http_status=$(curl --connect-timeout 10 --max-time 20 -sS -o health.json -w '%{http_code}' "$health_url" || true)
+            echo "Health assurance attempt ${attempt}/${max_attempts}: HTTP ${http_status}"
+
+            if jq -e . health.json >/dev/null 2>&1; then
+              jq -c '{status, environment, commit, version, checks: {database: (.checks.database // false), objectStorage: (.checks.objectStorage // false)}}' health.json
+            else
+              echo "Health response was not valid JSON"
+            fi
+
+            if [[ "$http_status" == 200 ]] && jq -e --arg version "$NEW_VERSION" --arg commit "$COMMIT_SHA" '.status == "ok" and .commit == $commit and .version == $version and .checks.database == true and .checks.objectStorage == true' health.json >/dev/null; then
+              assured=true
+              break
+            fi
+            if (( attempt < max_attempts )); then sleep "$retry_delay"; fi
+          done
+          [[ "$assured" == true ]]
           trap - ERR
       - name: Record successful deployment
         env: { TARGET_ENV: "${{ inputs.target }}", COMMIT_SHA: "${{ inputs.commit }}" }
