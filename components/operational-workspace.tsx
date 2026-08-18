@@ -147,6 +147,60 @@ const nav = [
   { id: "reporting" as View, label: "Reporting", icon: FileCheck2 },
 ];
 
+export function workspaceSearchResults(
+  state: Pick<AppState, "clients" | "engagements" | "tasks">,
+  query: string,
+) {
+  const needle = query.trim().toLocaleLowerCase("en-GB");
+  if (!needle) return null;
+  return {
+    clients: state.clients
+      .filter((client) =>
+        [client.name, client.charityNumber, client.legalForm, client.contactName]
+          .join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(needle),
+      )
+      .slice(0, 5),
+    engagements: state.engagements
+      .filter((engagement) =>
+        [
+          engagement.clientName,
+          engagement.charityNumber,
+          engagement.status,
+          engagement.periodEnd,
+        ]
+          .join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(needle),
+      )
+      .slice(0, 5),
+    tasks: state.tasks
+      .filter((task) =>
+        [task.title, task.direction, task.phase, task.status]
+          .join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(needle),
+      )
+      .slice(0, 5),
+  };
+}
+
+function useWorkspaceSearchShortcut() {
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
+  return searchRef;
+}
+
 export function OperationalWorkspace() {
   const [state, setState] = useState<AppState | null>(null),
     [view, setView] = useState<View>("portfolio"),
@@ -162,6 +216,7 @@ export function OperationalWorkspace() {
     [panel, setPanel] = useState<
       "notifications" | "practice" | "profile" | null
     >(null);
+  const searchRef = useWorkspaceSearchShortcut();
   const load = async () => {
     const r = await fetch("/api/state", { cache: "no-store" }),
       j = await r.json();
@@ -244,24 +299,7 @@ export function OperationalWorkspace() {
     setView("clients");
     setQuery("");
   };
-  const results = query.trim()
-    ? {
-        engagements: state.engagements
-          .filter((e) =>
-            (e.clientName + e.charityNumber + e.status)
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .slice(0, 5),
-        tasks: state.tasks
-          .filter((t) =>
-            (t.title + " " + t.direction)
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .slice(0, 5),
-      }
-    : null;
+  const results = workspaceSearchResults(state, query);
   return (
     <div className="app-shell" onClick={() => panel && setPanel(null)}>
       <aside
@@ -392,6 +430,7 @@ export function OperationalWorkspace() {
           </Button>
           <div className="search">
             <SearchBox
+              ref={searchRef}
               className="workspace-searchbox"
               aria-label="Search"
               placeholder="Search engagements, clients or workpapers"
@@ -401,6 +440,15 @@ export function OperationalWorkspace() {
             <kbd>⌘ K</kbd>
             {results && (
               <div className="search-results">
+                {results.clients.map((client) => (
+                  <button key={`client-${client.id}`} onClick={() => goClient(client.id)}>
+                    <Building2 />
+                    <span>
+                      <strong>{client.name}</strong>
+                      <small>{client.charityNumber} · Client record</small>
+                    </span>
+                  </button>
+                ))}
                 {results.engagements.map((e) => (
                   <button key={e.id} onClick={() => go(e.id)}>
                     <Building2 />
@@ -433,7 +481,9 @@ export function OperationalWorkspace() {
                     </span>
                   </button>
                 ))}
-                {!results.engagements.length && !results.tasks.length && (
+                {!results.clients.length &&
+                  !results.engagements.length &&
+                  !results.tasks.length && (
                   <p>No matching records.</p>
                 )}
               </div>
@@ -704,10 +754,14 @@ function FirstRunWorkspace({
   const [clientSection, setClientSection] =
     useState<ClientSection>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useWorkspaceSearchShortcut();
+  const results = workspaceSearchResults(state, query);
   const openClient = (id: PublicId) => {
     setSelectedClientId(id);
     setClientSection("overview");
     setView("clients");
+    setQuery("");
   };
   return (
     <div className="app-shell">
@@ -737,7 +791,31 @@ function FirstRunWorkspace({
         <header className="topbar">
           <Logo />
           <button className="mobile-menu-button" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}><Menu /></button>
-          <div className="search"><Search /><span>Dashboard</span></div>
+          <div className="search">
+            <SearchBox
+              ref={searchRef}
+              className="workspace-searchbox"
+              aria-label="Search"
+              placeholder="Search clients"
+              value={query}
+              onChange={(_, data) => setQuery(data.value)}
+            />
+            <kbd>Ctrl K</kbd>
+            {results && (
+              <div className="search-results">
+                {results.clients.map((client) => (
+                  <button key={client.id} onClick={() => openClient(client.id)}>
+                    <Building2 />
+                    <span>
+                      <strong>{client.name}</strong>
+                      <small>{client.charityNumber} · Client record</small>
+                    </span>
+                  </button>
+                ))}
+                {!results.clients.length && <p>No matching clients.</p>}
+              </div>
+            )}
+          </div>
           <div className="top-actions"><Link href="/auth/sign-out" className="portal-link">Sign out</Link></div>
         </header>
         <nav className="breadcrumbs" aria-label="Breadcrumb">
