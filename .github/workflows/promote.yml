@@ -20,7 +20,7 @@ jobs:
       name: ${{ inputs.target }}
       url: ${{ vars.PUBLIC_SITE_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: "${{ inputs.commit }}", fetch-depth: 0 }
       - name: Enforce pinned source and ordered promotion
         shell: bash
