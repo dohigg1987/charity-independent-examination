@@ -50,7 +50,7 @@ test("search remains functional before the first engagement exists", () => {
   assert.doesNotMatch(firstRun, /<span>Dashboard<\/span>/);
 });
 
-test("first-run navigation retains every engagement-independent module", () => {
+test("first-run navigation retains the full product information architecture", () => {
   const firstRun = section("function FirstRunWorkspace(", "function Portfolio(");
   for (const view of ["clients", "team", "templates", "audit", "admin"]) {
     assert.match(firstRun, new RegExp(`view === "${view}"`));
@@ -71,7 +71,9 @@ test("first-run navigation retains every engagement-independent module", () => {
     firstRun,
     /view === "admin"[\s\S]*<Admin state=\{state\} mutate=\{mutate\} notify=\{notify\}/,
   );
-  assert.match(firstRun, /disabled[\s\S]*Annual-file workspace unavailable until an engagement is created/);
+  assert.match(firstRun, /\{nav\.map\(\(item\) =>/);
+  assert.match(firstRun, /<NoEngagementWorkspace[\s\S]*kind: state\.clients\.length \? "engagement" : "client"/);
+  assert.match(firstRun, /Create an engagement to continue/);
 });
 
 test("the advertised keyboard shortcut focuses the real search input", () => {

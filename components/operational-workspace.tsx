@@ -747,9 +747,7 @@ function FirstRunWorkspace({
   error: string;
   toast: string;
 }) {
-  const [view, setView] = useState<
-    "portfolio" | "clients" | "team" | "templates" | "audit" | "admin"
-  >("portfolio");
+  const [view, setView] = useState<View>("portfolio");
   const [selectedClientId, setSelectedClientId] = useState<PublicId | null>(
     state.clients[0]?.id ?? null,
   );
@@ -775,15 +773,15 @@ function FirstRunWorkspace({
         </div>
         <nav aria-label="Main navigation">
           <p className="nav-label">WORKSPACE</p>
-          <Side active={view === "portfolio"} icon={<LayoutDashboard />} text="Dashboard" click={() => { setView("portfolio"); setMobileNavOpen(false); }} />
-          <Button
-            appearance="subtle"
-            disabled
-            aria-label="Annual-file workspace unavailable until an engagement is created"
-          >
-            <LockKeyhole />
-            <span>Annual-file workspace</span>
-          </Button>
+          {nav.map((item) => (
+            <Side
+              key={item.id}
+              active={view === item.id}
+              icon={<item.icon />}
+              text={item.label}
+              click={() => { setView(item.id); setMobileNavOpen(false); }}
+            />
+          ))}
           <p className="nav-label lower">MANAGE</p>
           <Side active={view === "clients"} icon={<Building2 />} text="Clients" click={() => { setView("clients"); setMobileNavOpen(false); }} />
           <Side active={view === "team"} icon={<Users />} text="Team" click={() => { setView("team"); setMobileNavOpen(false); }} />
@@ -837,6 +835,12 @@ function FirstRunWorkspace({
             <strong aria-current="page">
               {{
                 portfolio: "Dashboard",
+                engagement: "Engagements",
+                requests: "Client requests",
+                messages: "Messages",
+                review: "Review",
+                concerns: "Findings & concerns",
+                reporting: "Reporting",
                 clients: "Clients",
                 team: "Team",
                 templates: "Templates",
@@ -880,12 +884,59 @@ function FirstRunWorkspace({
         {view === "admin" && (
           <Admin state={state} mutate={mutate} notify={notify} />
         )}
+        {(["engagement", "requests", "messages", "review", "concerns", "reporting"] as View[]).includes(view) && (
+          <NoEngagementWorkspace
+            view={view}
+            hasClients={state.clients.length > 0}
+            create={() => setDialog({ kind: state.clients.length ? "engagement" : "client" })}
+          />
+        )}
       </main>
       {dialog && (
         <DialogView dialog={dialog} close={() => setDialog(null)} state={state} mutate={mutate} notify={notify} />
       )}
       {toast && <div className="toast"><CheckCircle2 />{toast}</div>}
     </div>
+  );
+}
+
+function NoEngagementWorkspace({
+  view,
+  hasClients,
+  create,
+}: {
+  view: View;
+  hasClients: boolean;
+  create: () => void;
+}) {
+  const titles: Partial<Record<View, string>> = {
+    engagement: "Engagements",
+    requests: "Client requests",
+    messages: "Messages",
+    review: "Review",
+    concerns: "Findings & concerns",
+    reporting: "Reporting",
+  };
+  return (
+    <Page
+      eye="ANNUAL FILE WORKSPACE"
+      title={titles[view] ?? "Engagement workspace"}
+      desc="This workspace becomes available when the first annual independent examination is created."
+      action={
+        <Button appearance="primary" onClick={create}>
+          <Plus /> {hasClients ? "New engagement" : "Add first client"}
+        </Button>
+      }
+    >
+      <Card className="client-zero-state" role="region" aria-label="No engagement created">
+        <LockKeyhole />
+        <h2>Create an engagement to continue</h2>
+        <p>{hasClients ? "Choose a client and create its annual file to use this workspace." : "Create the charity record first. Contact details can be added later."}</p>
+        <Button appearance="primary" onClick={create}>
+          <Plus /> {hasClients ? "Create engagement" : "Create client"}
+        </Button>
+      </Card>
+    </Page>
   );
 }
 
