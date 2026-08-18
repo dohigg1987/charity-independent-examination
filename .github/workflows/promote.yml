@@ -4,11 +4,11 @@ on:
     inputs:
       target: { required: true, type: string }
       commit: { required: true, type: string }
-  workflow_dispatch:
-    inputs:
-      target: { description: Environment, required: true, type: choice, options: [dev, test, preprod, production] }
-      commit: { description: Full commit SHA, required: true, type: string }
-permissions: { contents: write, id-token: write, attestations: write }
+      artifact_run_id: { required: true, type: string }
+permissions:
+  actions: read
+  attestations: read
+  contents: write
 concurrency:
   group: clarity-ie-${{ inputs.target }}
   cancel-in-progress: false
@@ -34,15 +34,33 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22.13.0, cache: npm }
       - run: npm ci
-      - run: npm run security:audit -- --audit-level=high
-      - run: npm run migrations:check
-      - run: npm test
-      - name: Record artifact digest
+      - name: Download immutable CI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: clarity-ie-release-${{ inputs.commit }}
+          path: dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.artifact_run_id }}
+      - name: Verify artifact identity, completeness and provenance
         id: artifact
         shell: bash
-        run: find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS; echo "digest=$(sha256sum dist/SHA256SUMS | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/attest-build-provenance@v2
-        with: { subject-path: dist/SHA256SUMS }
+        env:
+          COMMIT_SHA: ${{ inputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(jq -er .commit dist/RELEASE.json)" = "$COMMIT_SHA"
+          LC_ALL=C find dist -type f ! -path dist/SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > actual-SHA256SUMS
+          cmp --silent dist/SHA256SUMS actual-SHA256SUMS
+          gh attestation verify dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml" \
+            --source-digest "$COMMIT_SHA" \
+            --source-ref refs/heads/main \
+            --deny-self-hosted-runners
+          digest=$(sha256sum dist/SHA256SUMS | cut -d ' ' -f1)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Render isolated environment configuration
         id: config
         env:
@@ -175,5 +193,16 @@ jobs:
       - name: Record successful deployment
         env: { TARGET_ENV: "${{ inputs.target }}", COMMIT_SHA: "${{ inputs.commit }}" }
         shell: bash
-        run: git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com; tag="deployed-${TARGET_ENV}-${COMMIT_SHA}"; git tag -a "$tag" -m "$TARGET_ENV deployment of $COMMIT_SHA"; git push origin "$tag"
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          tag="deployed-${TARGET_ENV}-${COMMIT_SHA}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/${tag}:refs/tags/${tag}"
+            test "$(git rev-list -n 1 "$tag")" = "$COMMIT_SHA"
+          else
+            git tag -a "$tag" -m "$TARGET_ENV deployment of $COMMIT_SHA"
+            git push origin "$tag"
+          fi
 
