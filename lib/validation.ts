@@ -41,6 +41,10 @@ export function requireEmail(value: string): string {
   return email;
 }
 
+export function optionalEmail(value: string): string {
+  return value.trim() ? requireEmail(value) : "";
+}
+
 export function requireOneOf(
   value: string,
   allowed: readonly string[],

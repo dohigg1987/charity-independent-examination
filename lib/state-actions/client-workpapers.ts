@@ -13,7 +13,7 @@ import {
   type Principal,
 } from "@/lib/authz";
 import {
-  requireEmail,
+  optionalEmail,
   requireIsoDate,
   requireNonNegativeNumber,
   requireOneOf,
@@ -115,9 +115,9 @@ export async function handleClientWorkpaperAction(
   if (!actions.has(action)) return false;
   const db = getDb();
     if (action === "createClient") {
-      if (!body.name || !body.charityNumber || !body.contactEmail)
+      if (!body.name || !body.charityNumber)
         return Response.json(
-          { error: "Name, charity number and contact email are required" },
+          { error: "Name and charity number are required" },
           { status: 400 },
         );
       const publicId = crypto.randomUUID();
@@ -131,7 +131,7 @@ export async function handleClientWorkpaperAction(
           charityNumber: String(body.charityNumber).trim(),
           legalForm: String(body.legalForm || "CIO"),
           contactName: String(body.contactName || ""),
-          contactEmail: requireEmail(String(body.contactEmail)),
+          contactEmail: optionalEmail(String(body.contactEmail || "")),
         });
       const { statement: clientAudit } = await prepareAuditInsert(
         who.tenantId,
@@ -157,8 +157,8 @@ export async function handleClientWorkpaperAction(
           charityNumber: String(body.charityNumber || row.charityNumber).trim(),
           legalForm: String(body.legalForm || row.legalForm),
           contactName: String(body.contactName || row.contactName),
-          contactEmail: requireEmail(
-            String(body.contactEmail || row.contactEmail),
+          contactEmail: optionalEmail(
+            String(body.contactEmail ?? row.contactEmail),
           ),
           status: requireOneOf(
             String(body.status || row.status),

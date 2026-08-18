@@ -106,7 +106,7 @@ async function handleUiAction(action: () => Promise<void>) {
   }
 }
 const nav = [
-  { id: "portfolio" as View, label: "Portfolio", icon: LayoutDashboard },
+  { id: "portfolio" as View, label: "Dashboard", icon: LayoutDashboard },
   { id: "engagement" as View, label: "Engagements", icon: BookOpenCheck },
   { id: "requests" as View, label: "Client requests", icon: Send },
   { id: "messages" as View, label: "Messages", icon: MessageSquare },
@@ -658,51 +658,72 @@ function FirstRunWorkspace({
   error: string;
   toast: string;
 }) {
-  const hasClient = state.clients.length > 0;
-  const firstName = state.actor.name.split(" ")[0] || state.actor.name;
+  const [view, setView] = useState<"portfolio" | "clients">("portfolio");
+  const [selectedClientId, setSelectedClientId] = useState<PublicId | null>(
+    state.clients[0]?.id ?? null,
+  );
+  const [clientSection, setClientSection] =
+    useState<ClientSection>("permanent");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const openClient = (id: PublicId) => {
+    setSelectedClientId(id);
+    setClientSection("permanent");
+    setView("clients");
+  };
   return (
-    <div className="first-run-shell">
-      <header className="first-run-header">
-        <Logo />
-        <div>
-          <span className="first-run-identity">
-            <span className="avatar">{initials(state.actor.name)}</span>
-            <span><strong>{state.actor.name}</strong><small>{state.actor.email}</small></span>
-          </span>
-          <Link href="/auth/sign-out" className="first-run-signout">Sign out</Link>
+    <div className="app-shell">
+      <aside className={`sidebar ${mobileNavOpen ? "mobile-open" : ""}`}>
+        <Logo inverse />
+        <div className="organisation-switch">
+          <span className="org-avatar">{initials(state.practiceName)}</span>
+          <span><small>Organisation</small>{state.practiceName}</span>
         </div>
-      </header>
-      <main className="first-run-main">
-        <section className="first-run-intro">
-          <p className="eyebrow">PRACTICE SETUP</p>
-          <h1>Welcome to Clarity IE, {firstName}.</h1>
-          <p>Your secure practice workspace is ready. Complete these two short steps to open your first independent examination file.</p>
-          <div className="first-run-assurance">
-            <ShieldCheck />
-            <span><strong>Your practice is active</strong><small>{state.practiceName} · Administrator access</small></span>
-          </div>
-        </section>
-        <section className="first-run-card" aria-label="Getting started">
-          <header>
-            <div><p className="eyebrow">GETTING STARTED</p><h2>Set up your first engagement</h2></div>
-            <span>{hasClient ? "1 of 2 complete" : "Ready to begin"}</span>
-          </header>
-          <ol className="first-run-steps">
-            <li className={hasClient ? "complete" : "current"}>
-              <span className="step-number">{hasClient ? <Check /> : "1"}</span>
-              <div><strong>Add the charity</strong><p>Record the charity, registration number and primary contact.</p>{hasClient && <small>{state.clients[0].name} added</small>}</div>
-              <button className={hasClient ? "secondary" : "primary"} onClick={() => setDialog({ kind: "client" })}><Plus />{hasClient ? "Add another" : "Add charity"}</button>
-            </li>
-            <li className={hasClient ? "current" : "locked"}>
-              <span className="step-number">2</span>
-              <div><strong>Create the engagement</strong><p>Choose the reporting period, jurisdiction and accounting basis.</p></div>
-              <button className="primary" disabled={!hasClient} onClick={() => setDialog({ kind: "engagement" })}><BookOpenCheck />Create engagement</button>
-            </li>
-          </ol>
-          <footer><LockKeyhole /><span><strong>Private by default</strong>Your client records and examination files are only visible to authorised practice users.</span></footer>
-        </section>
+        <nav aria-label="Main navigation">
+          <p className="nav-label">WORKSPACE</p>
+          <Side active={view === "portfolio"} icon={<LayoutDashboard />} text="Dashboard" click={() => { setView("portfolio"); setMobileNavOpen(false); }} />
+          <p className="nav-label lower">MANAGE</p>
+          <Side active={view === "clients"} icon={<Building2 />} text="Clients" click={() => { setView("clients"); setMobileNavOpen(false); }} />
+        </nav>
+        <div className="sidebar-foot">
+          <ShieldCheck />
+          <span><strong>Control framework</strong><small>UK charity regulatory regimes</small></span>
+        </div>
+        <Link href="/auth/sign-out" className="user-card">
+          <span className="avatar">{initials(state.actor.name)}</span>
+          <span><strong>{state.actor.name}</strong><small>Sign out</small></span>
+        </Link>
+      </aside>
+      {mobileNavOpen && <button className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+      <main className="main">
+        <header className="topbar">
+          <button className="mobile-menu-button" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}><Menu /></button>
+          <div className="search"><Search /><span>Dashboard</span></div>
+          <div className="top-actions"><Link href="/auth/sign-out" className="portal-link">Sign out</Link></div>
+        </header>
+        <nav className="breadcrumbs" aria-label="Breadcrumb">
+          <span><strong aria-current="page">{view === "portfolio" ? "Dashboard" : "Clients"}</strong></span>
+        </nav>
+        {error && <div className="error-banner"><AlertTriangle />{error}</div>}
+        {view === "portfolio" ? (
+          <Portfolio state={state} query="" open={() => undefined} create={() => setDialog({ kind: state.clients.length ? "engagement" : "client" })} />
+        ) : (
+          <Clients
+            state={state}
+            selectedId={selectedClientId}
+            section={clientSection}
+            selectClient={openClient}
+            selectSection={setClientSection}
+            create={() => setDialog({ kind: "client" })}
+            edit={(client) => setDialog({ kind: "editClient", data: client })}
+            addTrustee={(client) => setDialog({ kind: "trustee", data: client })}
+            editTrustee={(trustee) => setDialog({ kind: "editTrustee", data: trustee })}
+            addUser={(client) => setDialog({ kind: "clientUser", data: client })}
+            mutate={mutate}
+            notify={notify}
+            openAnnual={() => undefined}
+          />
+        )}
       </main>
-      {error && <div className="error-banner first-run-error"><AlertTriangle />{error}</div>}
       {dialog && (
         <DialogView dialog={dialog} close={() => setDialog(null)} state={state} mutate={mutate} notify={notify} />
       )}
@@ -735,7 +756,7 @@ function Portfolio({
       action={
         <button className="primary" onClick={create}>
           <Plus />
-          New engagement
+          {state.clients.length ? "New engagement" : "Add first client"}
         </button>
       }
     >
@@ -823,6 +844,13 @@ function Portfolio({
             <ChevronRight />
           </button>
         ))}
+        {!rows.length && (
+          <div className="conversation-empty">
+            <LayoutDashboard />
+            <strong>Your portfolio is ready</strong>
+            <p>Add your first client, then create an engagement to begin.</p>
+          </div>
+        )}
       </section>
     </Page>
   );
@@ -2592,7 +2620,7 @@ function Clients({
   openAnnual,
 }: {
   state: AppState;
-  selectedId: PublicId;
+  selectedId: PublicId | null;
   section: ClientSection;
   selectClient: (id: PublicId) => void;
   selectSection: (section: ClientSection) => void;
@@ -3452,10 +3480,9 @@ function DialogView({
             />
             <Field
               n="contactEmail"
-              l="Contact email"
+              l="Contact email (optional)"
               type="email"
               v={client?.contactEmail}
-              required
             />
             {dialog.kind === "editClient" && (
               <Select
@@ -3886,7 +3913,7 @@ function Breadcrumbs({
   };
   const crumbs: { label: string; action?: () => void }[] = [
     {
-      label: "Portfolio",
+      label: "Dashboard",
       action: view === "portfolio" ? undefined : goPortfolio,
     },
   ];
