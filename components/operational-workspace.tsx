@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   Loader2,
   LockKeyhole,
+  Menu,
   MoreHorizontal,
   MessageSquare,
   Paperclip,
@@ -125,6 +126,7 @@ export function OperationalWorkspace() {
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [dialog, setDialog] = useState<Dialog>(null),
+    [mobileNavOpen, setMobileNavOpen] = useState(false),
     [panel, setPanel] = useState<
       "notifications" | "practice" | "profile" | null
     >(null);
@@ -230,7 +232,10 @@ export function OperationalWorkspace() {
     : null;
   return (
     <div className="app-shell" onClick={() => panel && setPanel(null)}>
-      <aside className="sidebar">
+      <aside
+        className={`sidebar ${mobileNavOpen ? "mobile-open" : ""}`}
+        onClick={() => mobileNavOpen && setMobileNavOpen(false)}
+      >
         <Logo inverse />
         <button
           className="organisation-switch"
@@ -241,7 +246,7 @@ export function OperationalWorkspace() {
         >
           <span className="org-avatar">DO</span>
           <span>
-            <small>Organisation</small>D O&apos;Higgins &amp; Co
+            <small>Organisation</small>{state.practiceName}
           </span>
           <ChevronDown />
         </button>
@@ -326,13 +331,28 @@ export function OperationalWorkspace() {
           <span className="avatar">{initials(state.actor.name)}</span>
           <span>
             <strong>{state.actor.name}</strong>
-            <small>Independent Examiner</small>
+            <small>{label(state.actor.role)}</small>
           </span>
           <MoreHorizontal />
         </button>
       </aside>
+      {mobileNavOpen && (
+        <button
+          className="mobile-nav-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
       <main className="main">
         <header className="topbar">
+          <button
+            className="mobile-menu-button"
+            aria-label="Open navigation"
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((open) => !open)}
+          >
+            <Menu />
+          </button>
           <div className="search">
             <Search />
             <input
@@ -580,7 +600,7 @@ export function OperationalWorkspace() {
       {panel === "practice" && (
         <Float title="Practice" close={() => setPanel(null)}>
           <div className="panel-copy">
-            <strong>D O&apos;Higgins &amp; Co</strong>
+            <strong>{state.practiceName}</strong>
             <p>
               Independent examination workspace for charities in England and
               Wales.
@@ -4094,10 +4114,10 @@ function Stat({
   return (
     <article>
       <span className={`stat-icon ${c}`}>{icon}</span>
-      <span>
-        {l}
+      <span className="stat-copy">
+        <small>{l}</small>
         <strong>{v}</strong>
-        <i>{n}</i>
+        <em>{n}</em>
       </span>
     </article>
   );
