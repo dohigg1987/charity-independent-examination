@@ -551,3 +551,29 @@ html,body,.clarity-fluent-provider{background:#f5f5f5;color:#242424;font-family:
 @media(max-width:1000px){.client-master-detail{grid-template-columns:1fr}.engagement-phase-strip{grid-template-columns:1fr 1fr}.engagement-phase-strip>div:nth-child(3){border-top:1px solid #e0e0e0;border-left:0}.engagement-phase-strip>div:nth-child(4){border-top:1px solid #e0e0e0}.workpaper-accordions,.accordion-layout{display:block}.wp-accordion{display:block}.wp-accordion-body{margin-bottom:12px}.accordion-layout>.activity{margin-top:16px}}
 @media(max-width:760px){.app-shell{padding-top:104px}.topbar{grid-template-columns:auto minmax(0,1fr) auto;gap:10px;height:104px;padding:8px 14px}.topbar:before{grid-column:2;width:132px;height:40px;background-size:132px auto}.topbar .mobile-menu-button{display:inline-flex;grid-column:1;grid-row:1}.topbar .search{grid-column:1/-1;grid-row:2}.top-actions{grid-column:3;grid-row:1}.sidebar.mobile-open{inset:104px auto 0 0;background:#203845}.breadcrumbs{top:0}}
 @media(max-width:640px){.page-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.client-list-toolbar{grid-template-columns:1fr}.client-grid-head{display:none}.client-list>button{grid-template-columns:minmax(0,1fr) auto}.client-list>button>span:nth-child(n+3){display:none}.client-overview-grid{display:grid;grid-template-areas:"relationship" "action" "annual" "record";grid-template-columns:1fr}.engagement-phase-strip{margin-inline:14px}.accordion-layout{padding-inline:14px}}
+
+/* Final prototype alignment: exact Clarity explorer neutrals, one composed
+   client-detail surface, and a full-width annual-file editor above the split
+   programme/workpaper canvas. */
+:root{
+  --ink:#203845;--muted:#546b75;--line:#d7e4e4;--soft:#f3f7f7;
+  --app-bg:#f3f7f7;--surface:#fff;--text:#203845;--text-muted:#546b75;
+  --border:#d7e4e4;
+}
+html,body,.clarity-fluent-provider,.main,.app-shell{background:#f3f7f7;color:#203845}
+.panel,.stat-grid article,.request-card,.portal-side-card,.admin-shell,.team-member-card{border-color:#d7e4e4}
+.breadcrumbs,.client-grid-head,.table-head,.request-head{border-color:#d7e4e4;background:#f7fbfb}
+
+.client-profile{gap:0;overflow:hidden;border:1px solid #d7e4e4;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(32,56,69,.06)}
+.client-profile>.profile-summary{border:0;border-radius:0;box-shadow:none}
+.client-profile>.client-file-tabs{border:0;border-top:1px solid #d7e4e4;border-bottom:1px solid #d7e4e4;border-radius:0}
+.client-profile>.client-overview-grid{padding:16px;background:#f7fbfb}
+.client-profile>.client-overview-grid>.panel{box-shadow:none}
+.client-profile>.panel:not(.profile-summary),.client-profile>.client-governance-stack,.client-profile>.permanent-file{margin:16px}
+
+.workpaper-accordions>.annual-file-section{grid-column:1/-1;grid-row:1;display:grid;min-width:0;margin-bottom:16px}
+.workpaper-accordions>.annual-file-section>.scope-card,.workpaper-accordions>.annual-file-section>.concerns-card,.workpaper-accordions>.annual-file-section>.annual-file-front{width:100%;min-width:0;border-color:#d7e4e4}
+.workpaper-accordions>.wp-accordion-body{grid-row:2/span 30}
+.topbar:before{display:none}.topbar>.logo{grid-column:1;width:176px}.topbar>.logo .brand-logo-image{width:176px}
+@media(max-width:1000px){.workpaper-accordions>.annual-file-section{display:block}.workpaper-accordions>.wp-accordion-body{grid-row:auto}}
+@media(max-width:760px){.topbar>.logo{grid-column:2;grid-row:1;width:132px}.topbar>.logo .brand-logo-image{width:132px}}

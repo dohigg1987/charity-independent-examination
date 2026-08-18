@@ -376,6 +376,7 @@ export function OperationalWorkspace() {
       )}
       <main className="main">
         <header className="topbar">
+          <Logo />
           <Button
             appearance="subtle"
             className="mobile-menu-button"
@@ -730,6 +731,7 @@ function FirstRunWorkspace({
       {mobileNavOpen && <button className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
       <main className="main">
         <header className="topbar">
+          <Logo />
           <button className="mobile-menu-button" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}><Menu /></button>
           <div className="search"><Search /><span>Dashboard</span></div>
           <div className="top-actions"><Link href="/auth/sign-out" className="portal-link">Sign out</Link></div>
@@ -2698,6 +2700,10 @@ function Clients({
 }) {
   const [clientQuery, setClientQuery] = useState("");
   const [clientStatus, setClientStatus] = useState("ALL");
+  const [activityFormRequest, setActivityFormRequest] = useState<{
+    clientId: PublicId;
+    sequence: number;
+  } | null>(null);
   const client =
     state.clients.find((c) => c.id === selectedId) ?? state.clients[0];
   const visibleClients = state.clients.filter((candidate) => {
@@ -2767,7 +2773,13 @@ function Clients({
             <Button
               appearance="secondary"
               className="secondary"
-              onClick={() => selectSection("activity")}
+              onClick={() => {
+                selectSection("activity");
+                setActivityFormRequest((current) => ({
+                  clientId: client.id,
+                  sequence: (current?.sequence ?? 0) + 1,
+                }));
+              }}
             >
               <Activity />
               Log activity
@@ -2781,7 +2793,7 @@ function Clients({
       }
     >
       <div className="client-master-detail">
-        <div className="client-list panel">
+        <div className="panel">
           <div className="client-list-toolbar">
             <SearchBox
               aria-label="Find client"
@@ -2799,11 +2811,12 @@ function Clients({
               <option value="INACTIVE">Inactive</option>
             </FluentSelect>
           </div>
-          <div className="client-grid-head" aria-hidden="true">
-            <span>Client</span>
-            <span>Status</span>
-            <span>Next action</span>
-            <span>Year end</span>
+          <div className="client-list" role="grid" aria-label="Clients">
+          <div className="client-grid-head" role="row">
+            <span role="columnheader">Client</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader">Next action</span>
+            <span role="columnheader">Year end</span>
           </div>
           {visibleClients.map((c) => {
             const nextAction = state.clientActivities
@@ -2821,28 +2834,33 @@ function Clients({
               .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
             return (
             <button
+              role="row"
+              aria-label={`${c.name}, charity number ${c.charityNumber}, ${label(c.status)}${nextAction ? `, next action ${nextAction.nextAction || nextAction.subject}` : ", no next action"}${latestFile ? `, year end ${fmtDate(latestFile.periodEnd)}` : ", no annual file"}`}
               className={c.id === client?.id ? "active" : ""}
               key={c.id}
               onClick={() => selectClient(c.id)}
             >
-              <span className="client-grid-name">
+              <span className="client-grid-name" role="gridcell">
                 <span className="charity-logo willow">{c.name[0]}</span>
                 <span>
                   <strong>{c.name}</strong>
                   <small>{c.charityNumber}</small>
                 </span>
               </span>
-              <span><Status s={c.status} /></span>
-              <span className="client-grid-action">
+              <span role="gridcell"><Status s={c.status} /></span>
+              <span className="client-grid-action" role="gridcell">
                 {nextAction?.nextAction || nextAction?.subject || "—"}
               </span>
-              <span>{latestFile ? fmtDate(latestFile.periodEnd) : "—"}</span>
+              <span role="gridcell">{latestFile ? fmtDate(latestFile.periodEnd) : "—"}</span>
             </button>
             );
           })}
           {!visibleClients.length && (
-            <p className="client-list-empty">No clients match this view.</p>
+            <div role="row">
+              <p className="client-list-empty" role="gridcell">No clients match this view.</p>
+            </div>
           )}
+          </div>
         </div>
         {client && (
           <section className="client-profile">
@@ -2975,6 +2993,11 @@ function Clients({
                 annualFiles={annualFiles}
                 mutate={mutate}
                 notify={notify}
+                openFormRequest={
+                  activityFormRequest?.clientId === client.id
+                    ? activityFormRequest.sequence
+                    : 0
+                }
               />
             )}
             {section === "permanent" && (
@@ -3289,6 +3312,7 @@ function ClientActivity({
   annualFiles,
   mutate,
   notify,
+  openFormRequest,
 }: {
   client: Client;
   contacts: ClientContact[];
@@ -3296,9 +3320,13 @@ function ClientActivity({
   annualFiles: Engagement[];
   mutate: Mutate;
   notify: Notify;
+  openFormRequest: number;
 }) {
   const [adding, setAdding] = useState(false),
     [formError, setFormError] = useState("");
+  useEffect(() => {
+    if (openFormRequest > 0) setAdding(true);
+  }, [openFormRequest]);
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
