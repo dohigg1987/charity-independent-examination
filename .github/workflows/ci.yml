@@ -32,7 +32,7 @@ jobs:
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Attest immutable release artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/SHA256SUMS
       - name: Upload immutable release artifact
