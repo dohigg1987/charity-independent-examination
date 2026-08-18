@@ -147,6 +147,60 @@ const nav = [
   { id: "reporting" as View, label: "Reporting", icon: FileCheck2 },
 ];
 
+export function workspaceSearchResults(
+  state: Pick<AppState, "clients" | "engagements" | "tasks">,
+  query: string,
+) {
+  const needle = query.trim().toLocaleLowerCase("en-GB");
+  if (!needle) return null;
+  return {
+    clients: state.clients
+      .filter((client) =>
+        [client.name, client.charityNumber, client.legalForm, client.contactName]
+          .join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(needle),
+      )
+      .slice(0, 5),
+    engagements: state.engagements
+      .filter((engagement) =>
+        [
+          engagement.clientName,
+          engagement.charityNumber,
+          engagement.status,
+          engagement.periodEnd,
+        ]
+          .join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(needle),
+      )
+      .slice(0, 5),
+    tasks: state.tasks
+      .filter((task) =>
+        [task.title, task.direction, task.phase, task.status]
+          .join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(needle),
+      )
+      .slice(0, 5),
+  };
+}
+
+function useWorkspaceSearchShortcut() {
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
+  return searchRef;
+}
+
 export function OperationalWorkspace() {
   const [state, setState] = useState<AppState | null>(null),
     [view, setView] = useState<View>("portfolio"),
@@ -162,6 +216,7 @@ export function OperationalWorkspace() {
     [panel, setPanel] = useState<
       "notifications" | "practice" | "profile" | null
     >(null);
+  const searchRef = useWorkspaceSearchShortcut();
   const load = async () => {
     const r = await fetch("/api/state", { cache: "no-store" }),
       j = await r.json();
@@ -244,24 +299,7 @@ export function OperationalWorkspace() {
     setView("clients");
     setQuery("");
   };
-  const results = query.trim()
-    ? {
-        engagements: state.engagements
-          .filter((e) =>
-            (e.clientName + e.charityNumber + e.status)
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .slice(0, 5),
-        tasks: state.tasks
-          .filter((t) =>
-            (t.title + " " + t.direction)
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .slice(0, 5),
-      }
-    : null;
+  const results = workspaceSearchResults(state, query);
   return (
     <div className="app-shell" onClick={() => panel && setPanel(null)}>
       <aside
@@ -392,6 +430,7 @@ export function OperationalWorkspace() {
           </Button>
           <div className="search">
             <SearchBox
+              ref={searchRef}
               className="workspace-searchbox"
               aria-label="Search"
               placeholder="Search engagements, clients or workpapers"
@@ -401,6 +440,15 @@ export function OperationalWorkspace() {
             <kbd>⌘ K</kbd>
             {results && (
               <div className="search-results">
+                {results.clients.map((client) => (
+                  <button key={`client-${client.id}`} onClick={() => goClient(client.id)}>
+                    <Building2 />
+                    <span>
+                      <strong>{client.name}</strong>
+                      <small>{client.charityNumber} · Client record</small>
+                    </span>
+                  </button>
+                ))}
                 {results.engagements.map((e) => (
                   <button key={e.id} onClick={() => go(e.id)}>
                     <Building2 />
@@ -433,7 +481,9 @@ export function OperationalWorkspace() {
                     </span>
                   </button>
                 ))}
-                {!results.engagements.length && !results.tasks.length && (
+                {!results.clients.length &&
+                  !results.engagements.length &&
+                  !results.tasks.length && (
                   <p>No matching records.</p>
                 )}
               </div>
@@ -697,17 +747,21 @@ function FirstRunWorkspace({
   error: string;
   toast: string;
 }) {
-  const [view, setView] = useState<"portfolio" | "clients">("portfolio");
+  const [view, setView] = useState<View>("portfolio");
   const [selectedClientId, setSelectedClientId] = useState<PublicId | null>(
     state.clients[0]?.id ?? null,
   );
   const [clientSection, setClientSection] =
     useState<ClientSection>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useWorkspaceSearchShortcut();
+  const results = workspaceSearchResults(state, query);
   const openClient = (id: PublicId) => {
     setSelectedClientId(id);
     setClientSection("overview");
     setView("clients");
+    setQuery("");
   };
   return (
     <div className="app-shell">
@@ -719,9 +773,21 @@ function FirstRunWorkspace({
         </div>
         <nav aria-label="Main navigation">
           <p className="nav-label">WORKSPACE</p>
-          <Side active={view === "portfolio"} icon={<LayoutDashboard />} text="Dashboard" click={() => { setView("portfolio"); setMobileNavOpen(false); }} />
+          {nav.map((item) => (
+            <Side
+              key={item.id}
+              active={view === item.id}
+              icon={<item.icon />}
+              text={item.label}
+              click={() => { setView(item.id); setMobileNavOpen(false); }}
+            />
+          ))}
           <p className="nav-label lower">MANAGE</p>
           <Side active={view === "clients"} icon={<Building2 />} text="Clients" click={() => { setView("clients"); setMobileNavOpen(false); }} />
+          <Side active={view === "team"} icon={<Users />} text="Team" click={() => { setView("team"); setMobileNavOpen(false); }} />
+          <Side active={view === "templates"} icon={<FolderOpen />} text="Templates" click={() => { setView("templates"); setMobileNavOpen(false); }} />
+          <Side active={view === "audit"} icon={<Activity />} text="Audit trail" click={() => { setView("audit"); setMobileNavOpen(false); }} />
+          <Side active={view === "admin"} icon={<ShieldCheck />} text="Administration" click={() => { setView("admin"); setMobileNavOpen(false); }} />
         </nav>
         <div className="sidebar-foot">
           <ShieldCheck />
@@ -737,16 +803,58 @@ function FirstRunWorkspace({
         <header className="topbar">
           <Logo />
           <button className="mobile-menu-button" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}><Menu /></button>
-          <div className="search"><Search /><span>Dashboard</span></div>
+          <div className="search">
+            <SearchBox
+              ref={searchRef}
+              className="workspace-searchbox"
+              aria-label="Search"
+              placeholder="Search clients"
+              value={query}
+              onChange={(_, data) => setQuery(data.value)}
+            />
+            <kbd>Ctrl K</kbd>
+            {results && (
+              <div className="search-results">
+                {results.clients.map((client) => (
+                  <button key={client.id} onClick={() => openClient(client.id)}>
+                    <Building2 />
+                    <span>
+                      <strong>{client.name}</strong>
+                      <small>{client.charityNumber} · Client record</small>
+                    </span>
+                  </button>
+                ))}
+                {!results.clients.length && <p>No matching clients.</p>}
+              </div>
+            )}
+          </div>
           <div className="top-actions"><Link href="/auth/sign-out" className="portal-link">Sign out</Link></div>
         </header>
         <nav className="breadcrumbs" aria-label="Breadcrumb">
-          <span><strong aria-current="page">{view === "portfolio" ? "Dashboard" : "Clients"}</strong></span>
+          <span>
+            <strong aria-current="page">
+              {{
+                portfolio: "Dashboard",
+                engagement: "Engagements",
+                requests: "Client requests",
+                messages: "Messages",
+                review: "Review",
+                concerns: "Findings & concerns",
+                reporting: "Reporting",
+                clients: "Clients",
+                team: "Team",
+                templates: "Templates",
+                audit: "Audit trail",
+                admin: "Administration",
+              }[view]}
+            </strong>
+          </span>
         </nav>
         {error && <div className="error-banner"><AlertTriangle />{error}</div>}
-        {view === "portfolio" ? (
+        {view === "portfolio" && (
           <Portfolio state={state} query="" open={() => undefined} create={() => setDialog({ kind: state.clients.length ? "engagement" : "client" })} />
-        ) : (
+        )}
+        {view === "clients" && (
           <Clients
             state={state}
             selectedId={selectedClientId}
@@ -763,12 +871,72 @@ function FirstRunWorkspace({
             openAnnual={() => undefined}
           />
         )}
+        {view === "team" && (
+          <Team
+            state={state}
+            create={() => setDialog({ kind: "team" })}
+            mutate={mutate}
+            notify={notify}
+          />
+        )}
+        {view === "templates" && <Templates />}
+        {view === "audit" && <Audit state={state} />}
+        {view === "admin" && (
+          <Admin state={state} mutate={mutate} notify={notify} />
+        )}
+        {(["engagement", "requests", "messages", "review", "concerns", "reporting"] as View[]).includes(view) && (
+          <NoEngagementWorkspace
+            view={view}
+            hasClients={state.clients.length > 0}
+            create={() => setDialog({ kind: state.clients.length ? "engagement" : "client" })}
+          />
+        )}
       </main>
       {dialog && (
         <DialogView dialog={dialog} close={() => setDialog(null)} state={state} mutate={mutate} notify={notify} />
       )}
       {toast && <div className="toast"><CheckCircle2 />{toast}</div>}
     </div>
+  );
+}
+
+function NoEngagementWorkspace({
+  view,
+  hasClients,
+  create,
+}: {
+  view: View;
+  hasClients: boolean;
+  create: () => void;
+}) {
+  const titles: Partial<Record<View, string>> = {
+    engagement: "Engagements",
+    requests: "Client requests",
+    messages: "Messages",
+    review: "Review",
+    concerns: "Findings & concerns",
+    reporting: "Reporting",
+  };
+  return (
+    <Page
+      eye="ANNUAL FILE WORKSPACE"
+      title={titles[view] ?? "Engagement workspace"}
+      desc="This workspace becomes available when the first annual independent examination is created."
+      action={
+        <Button appearance="primary" onClick={create}>
+          <Plus /> {hasClients ? "New engagement" : "Add first client"}
+        </Button>
+      }
+    >
+      <Card className="client-zero-state" role="region" aria-label="No engagement created">
+        <LockKeyhole />
+        <h2>Create an engagement to continue</h2>
+        <p>{hasClients ? "Choose a client and create its annual file to use this workspace." : "Create the charity record first. Contact details can be added later."}</p>
+        <Button appearance="primary" onClick={create}>
+          <Plus /> {hasClients ? "Create engagement" : "Create client"}
+        </Button>
+      </Card>
+    </Page>
   );
 }
 
