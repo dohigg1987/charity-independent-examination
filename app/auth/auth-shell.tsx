@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Body1, Card, Caption1, Subtitle2, Title1, Title2, tokens } from "@fluentui/react-components";
+import { Card } from "@fluentui/react-components";
 import { CheckmarkCircle20Regular, LockClosed24Regular, ShieldCheckmark20Regular } from "@fluentui/react-icons";
 import type { ReactNode } from "react";
 
@@ -8,28 +8,28 @@ export function AuthShell({ eyebrow, title, description, children }: { eyebrow: 
     <main className="auth-page">
       <section className="auth-brand-panel" aria-label="About Clarity IE">
         <div className="auth-brand-content">
-          <Image className="auth-logo" src="/clarity-ie-logo-dark.svg" alt="Clarity IE" width={350} height={80} priority unoptimized />
-          <Subtitle2 className="auth-brand-kicker">Independent examination, clearly controlled</Subtitle2>
-          <Title1 as="h2">Confidence from first file to final report.</Title1>
-          <Body1 className="auth-brand-copy">A secure workspace for evidence, review and compliant charity independent examination.</Body1>
+          <Image className="auth-logo" src="/clarity-ie-logo-inverse.svg" alt="Clarity IE" width={350} height={80} priority unoptimized />
+          <p className="auth-brand-kicker">Independent examination, clearly controlled</p>
+          <h2 className="auth-brand-title">Confidence from first file to final report.</h2>
+          <p className="auth-brand-copy">A secure workspace for evidence, review and compliant charity independent examination.</p>
           <ul className="auth-assurance-list">
             <li><CheckmarkCircle20Regular aria-hidden="true" /> One controlled engagement record</li>
             <li><CheckmarkCircle20Regular aria-hidden="true" /> Review-ready evidence and decisions</li>
             <li><CheckmarkCircle20Regular aria-hidden="true" /> Clear sign-off and audit history</li>
           </ul>
         </div>
-        <Caption1 className="auth-brand-foot"><ShieldCheckmark20Regular aria-hidden="true" /> Secure practice access</Caption1>
+        <p className="auth-brand-foot"><ShieldCheckmark20Regular aria-hidden="true" /> Secure practice access</p>
       </section>
       <section className="auth-form-panel">
-        <Card className="auth-card" style={{ boxShadow: tokens.shadow16 }}>
+        <Card className="auth-card">
           <Image className="auth-mobile-logo" src="/clarity-ie-logo.svg" alt="Clarity IE" width={350} height={80} priority unoptimized />
           <span className="auth-lock" aria-hidden="true"><LockClosed24Regular /></span>
-          <Caption1 className="auth-eyebrow">{eyebrow}</Caption1>
-          <Title2 as="h1">{title}</Title2>
-          <Body1 className="auth-description">{description}</Body1>
+          <p className="auth-eyebrow">{eyebrow}</p>
+          <h1 className="auth-title">{title}</h1>
+          <p className="auth-description">{description}</p>
           {children}
         </Card>
-        <Caption1 className="auth-help">Access is limited to authorised Clarity IE practice users.</Caption1>
+        <p className="auth-help">Access is limited to authorised Clarity IE practice users.</p>
       </section>
     </main>
   );

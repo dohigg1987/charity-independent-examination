@@ -108,6 +108,9 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
   );
   const outstanding = requests.filter((r) => r.status !== "RECEIVED");
   const received = requests.filter((r) => r.status === "RECEIVED");
+  if (state && previewMode && !engagement) {
+    return <PortalEmptyPreview clientName={state.clients[0]?.name ?? "Draft client"} practiceName={state.practiceName} />;
+  }
   const upload = async (request: EvidenceRequest) => {
     const draft = drafts[request.id] ?? { file: null, note: "" };
     if ((!draft.file && !draft.note.trim()) || !engagement) return;
@@ -669,6 +672,33 @@ export function ClientPortal({ previewMode = false }: { previewMode?: boolean })
         </span>
         <span>Secure engagement workspace</span>
       </footer>
+    </div>
+  );
+}
+
+function PortalEmptyPreview({ clientName, practiceName }: { clientName: string; practiceName: string }) {
+  return (
+    <div className="portal-shell portal-empty-preview-shell">
+      <header className="portal-header">
+        <Logo />
+        <div className="portal-header-tools">
+          <span className="secure"><LockKeyhole /> Secure client portal</span>
+          <span className="portal-identity"><span className="avatar client-avatar">{initials(clientName)}</span><span><strong>{clientName}</strong><small>Practitioner preview</small></span></span>
+          <Link className="portal-sign-out" href="/" aria-label="Return to practitioner workspace"><ArrowLeft /> Workspace</Link>
+        </div>
+      </header>
+      <main className="portal-main portal-empty-preview">
+        <div className="portal-preview-note" role="note"><LockKeyhole /><p><strong>Read-only practitioner preview</strong>This is the client-facing workspace before an annual engagement is opened.</p><Link href="/">Return to workspace</Link></div>
+        <section className="portal-empty-preview-card">
+          <span className="portal-empty-preview-icon"><FileText /></span>
+          <p className="eyebrow">{clientName.toUpperCase()}</p>
+          <h1>Client portal ready</h1>
+          <p>{practiceName} has created the client record. Evidence requests, secure messages and upload receipts will appear here when the first annual engagement is opened.</p>
+          <dl><div><dt>Client</dt><dd>{clientName}</dd></div><div><dt>Portal status</dt><dd>Awaiting first engagement</dd></div><div><dt>Access</dt><dd>Practitioner preview only</dd></div></dl>
+          <Button as="a" appearance="primary" href="/">Open practitioner workspace</Button>
+        </section>
+      </main>
+      <footer className="portal-footer"><span>Powered by <strong>Clarity IE</strong></span><span>Secure engagement workspace</span></footer>
     </div>
   );
 }

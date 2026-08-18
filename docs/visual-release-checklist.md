@@ -1,5 +1,16 @@
 # Visual release checklist
 
+## Authentication
+
+- Check sign-in at 1440×900 and 390×844: logo has no backing rectangle, hero text is bounded, form labels do not overlap, and the card fits without horizontal scrolling.
+- Check forgot-password and reset-password at the same viewports.
+- Confirm keyboard focus order is email, password, password visibility, forgot password, then submit.
+
+## Client portal
+
+- Check practitioner preview both before and after an annual engagement exists.
+- Confirm the pre-engagement preview explains what is missing instead of showing an error/retry screen.
+
 Complete this review for every user-interface release before production approval.
 
 - Confirm the zero-data, populated, validation-error and success states.
