@@ -1,0 +1,25 @@
+/* Authoritative authentication surface. Loaded last to isolate it from legacy application CSS. */
+.auth-page{min-height:100dvh;display:grid;grid-template-columns:minmax(420px,42%) minmax(520px,1fr);overflow:hidden;background:#f3f7f7;color:#203845}
+.auth-brand-panel{position:relative;isolation:isolate;min-height:100dvh;display:grid;grid-template-rows:1fr auto;overflow:hidden;padding:clamp(40px,5vw,76px);background:#203845;color:#fff}
+.auth-brand-panel::before{content:"";position:absolute;z-index:-1;width:min(58vw,680px);aspect-ratio:1;right:-34%;bottom:-31%;border:1px solid rgba(102,204,204,.2);border-radius:50%;box-shadow:0 0 0 70px rgba(102,204,204,.045),0 0 0 140px rgba(230,106,53,.035)}
+.auth-brand-content{width:min(500px,100%);align-self:center}
+.auth-logo{display:block;width:188px;height:auto;margin:0 0 clamp(52px,8vh,82px)}
+.auth-brand-kicker,.auth-eyebrow{margin:0 0 12px;color:#66cccc;font:700 12px/1.4 "Segoe UI Variable","Segoe UI",sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.auth-brand-title{max-width:500px;margin:0;color:#fff;font:650 clamp(40px,4vw,56px)/1.06 "Segoe UI Variable","Segoe UI",sans-serif;letter-spacing:-.035em}
+.auth-brand-copy{max-width:450px;margin:22px 0 27px;color:#c7d7dc;font:400 16px/1.55 "Segoe UI Variable","Segoe UI",sans-serif}
+.auth-assurance-list{display:grid;gap:12px;margin:0;padding:0;list-style:none;color:#e7f0f2;font:400 14px/1.45 "Segoe UI Variable","Segoe UI",sans-serif}
+.auth-assurance-list li{display:flex;align-items:center;gap:10px}.auth-assurance-list svg{flex:0 0 auto;color:#66cccc}
+.auth-brand-foot{align-self:end;display:flex;align-items:center;gap:8px;margin:34px 0 0;color:#aebfc5;font:500 12px/1.4 "Segoe UI Variable","Segoe UI",sans-serif}
+.auth-form-panel{position:relative;min-height:100dvh;display:grid;place-items:center;padding:44px clamp(28px,6vw,92px) 70px}
+.auth-card.fui-Card{width:min(448px,100%);display:block;padding:34px 36px 36px;border:1px solid #d7e4e4;border-radius:10px;background:#fff;box-shadow:0 14px 38px rgba(32,56,69,.1)}
+.auth-mobile-logo{display:none}.auth-lock{display:grid;width:40px;height:40px;margin:0 0 24px;place-items:center;border-radius:6px;background:#fff1e8;color:#d45e25}.auth-lock svg{width:20px;height:20px}.auth-eyebrow{color:#a54819;font-size:11px}
+.auth-title{margin:0;color:#203845;font:650 34px/1.15 "Segoe UI Variable","Segoe UI",sans-serif;letter-spacing:-.025em}
+.auth-description{margin:12px 0 27px;color:#5c7079;font:400 14px/1.55 "Segoe UI Variable","Segoe UI",sans-serif}
+.auth-form{display:grid;gap:18px}.auth-field.fui-Field{display:grid;gap:7px;min-width:0;color:#203845}.auth-field .fui-Field__label{color:#203845;font:650 13px/1.35 "Segoe UI Variable","Segoe UI",sans-serif}
+.auth-field .fui-Input{width:100%;min-width:0;min-height:40px;border:1px solid #bfcfd2;border-radius:5px;background:#fff;box-shadow:none}.auth-field .fui-Input::after{display:none}.auth-field .fui-Input:focus-within{border-color:#00796f;box-shadow:0 0 0 2px rgba(0,121,111,.14)}
+.auth-field .fui-Input input{min-width:0;padding:0 12px;color:#203845;font:400 14px/1.4 "Segoe UI Variable","Segoe UI",sans-serif}.auth-field .fui-Input input::placeholder{color:#82949b}
+.auth-password-field{position:relative;min-width:0}.auth-forgot-link{position:absolute;z-index:1;top:0;right:0;color:#a54819;font:600 12px/1.35 "Segoe UI Variable","Segoe UI",sans-serif;text-decoration:none}.auth-forgot-link:hover{text-decoration:underline;text-underline-offset:3px}.auth-password-field .fui-Button{min-width:36px;height:36px;color:#506872}
+.auth-submit.fui-Button{width:100%;min-height:42px;margin-top:2px;border:1px solid #00796f;border-radius:5px;background:#00796f;color:#fff;font:650 14px/1.4 "Segoe UI Variable","Segoe UI",sans-serif}.auth-submit.fui-Button:hover{border-color:#00675f;background:#00675f}.auth-submit.fui-Button:disabled{border-color:#a7b7ba;background:#a7b7ba}
+.auth-message{font-size:12px}.auth-text-link{color:#47606a;font-size:12px}.auth-password-guidance{margin:-6px 0 0;color:#6c7f87;font-size:12px}.auth-help{position:absolute;right:28px;bottom:22px;left:28px;margin:0;color:#71858d;font:400 11px/1.4 "Segoe UI Variable","Segoe UI",sans-serif;text-align:center}.auth-help::before{content:"";display:inline-block;width:5px;height:5px;margin:0 8px 1px 0;border-radius:50%;background:#1a8a7c}
+@media(max-width:960px){.auth-page{grid-template-columns:1fr;overflow:auto}.auth-brand-panel{display:none}.auth-form-panel{min-height:100dvh;padding:30px 24px 68px}.auth-card.fui-Card{width:min(430px,100%)}.auth-mobile-logo{display:block;width:154px;height:auto;margin:0 0 30px}}
+@media(max-width:520px){.auth-form-panel{place-items:start center;padding:22px 16px 58px}.auth-card.fui-Card{padding:26px 22px 28px;border-radius:8px;box-shadow:0 8px 24px rgba(32,56,69,.08)}.auth-mobile-logo{width:142px;margin-bottom:24px}.auth-lock{width:36px;height:36px;margin-bottom:20px}.auth-title{font-size:30px}.auth-description{margin-bottom:24px}.auth-help{right:16px;bottom:16px;left:16px}}
