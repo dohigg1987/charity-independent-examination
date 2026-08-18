@@ -586,6 +586,51 @@ export const clientUsers = sqliteTable(
     uniqueIndex("client_users_tenant_client_email_unique").on(table.tenantId, table.clientId, table.email),
   ],
 );
+export const clientContacts = sqliteTable(
+  "client_contacts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
+    clientId: integer("client_id").notNull().references(() => clients.id),
+    name: text("name").notNull(),
+    role: text("role").notNull().default(""),
+    email: text("email"),
+    phone: text("phone"),
+    isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+    status: text("status").notNull().default("ACTIVE"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("client_contacts_tenant_client_idx").on(table.tenantId, table.clientId),
+    index("client_contacts_tenant_status_idx").on(table.tenantId, table.status),
+  ],
+);
+export const clientActivities = sqliteTable(
+  "client_activities",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ...tenantColumns(),
+    clientId: integer("client_id").notNull().references(() => clients.id),
+    engagementId: integer("engagement_id").references(() => engagements.id),
+    contactId: integer("contact_id").references(() => clientContacts.id),
+    activityType: text("activity_type").notNull().default("NOTE"),
+    subject: text("subject").notNull(),
+    detail: text("detail").notNull().default(""),
+    occurredAt: text("occurred_at").notNull(),
+    nextAction: text("next_action").notNull().default(""),
+    followUpDate: text("follow_up_date"),
+    completedAt: text("completed_at"),
+    completedBy: text("completed_by"),
+    createdBy: text("created_by").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("client_activities_tenant_client_idx").on(table.tenantId, table.clientId),
+    index("client_activities_tenant_follow_up_idx").on(table.tenantId, table.followUpDate),
+    index("client_activities_engagement_idx").on(table.engagementId),
+  ],
+);
 export const auditEvents = sqliteTable(
   "audit_events",
   {

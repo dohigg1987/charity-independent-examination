@@ -21,7 +21,14 @@ const practiceActions = new Set([
   "updateTrustee",
   "addClientUser",
   "updateClientUser",
+  "createClientContact",
+  "updateClientContact",
   "updatePracticeSettings",
+]);
+
+const crmActivityActions = new Set([
+  "createClientActivity",
+  "completeClientFollowUp",
 ]);
 
 const platformManagedActions = new Set([
@@ -102,6 +109,8 @@ export async function authoriseStateAction(
     );
   else if (reviewActions.has(action))
     requirePermission(canReview(principal), "Reviewer permission is required");
+  else if (crmActivityActions.has(action))
+    requirePermission(canPrepare(principal), "Engagement team permission is required");
   else
     requirePermission(
       canPrepare(principal),
