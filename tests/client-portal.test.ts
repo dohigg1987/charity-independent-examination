@@ -74,8 +74,16 @@ test("the customer portal rejects unassigned identities and gives practitioners 
 });
 
 test("the customer portal has narrow-screen layout controls", async () => {
-  const css = await readFile("app/globals.css", "utf8");
+  const [layout, css] = await Promise.all([
+    readFile("app/layout.tsx", "utf8"),
+    readFile("app/portal.css", "utf8"),
+  ]);
+  assert.match(layout, /import "\.\/portal\.css"/);
+  assert.match(css, /Authoritative Fluent 2 \/ Clarity presentation/);
+  assert.match(css, /--p-teal:#00796f/);
+  assert.match(css, /\.portal-grid\{display:grid;grid-template-columns:minmax\(0,1fr\) 300px/);
+  assert.match(css, /\.portal-shell \.client-communications\{display:grid;grid-template-columns:330px minmax\(0,1fr\)/);
   assert.match(css, /@media\(max-width:820px\)[\s\S]*?\.portal-nav\{position:fixed/);
-  assert.match(css, /@media\(max-width:560px\)[\s\S]*?\.portal-engagement-switcher/);
-  assert.match(css, /@media\(max-width:560px\)[\s\S]*?\.portal-identity\{display:none\}/);
+  assert.match(css, /@media\(max-width:620px\)[\s\S]*?\.portal-engagement-switcher/);
+  assert.match(css, /@media\(max-width:820px\)[\s\S]*?\.portal-identity\{display:none\}/);
 });
