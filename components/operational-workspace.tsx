@@ -747,7 +747,9 @@ function FirstRunWorkspace({
   error: string;
   toast: string;
 }) {
-  const [view, setView] = useState<"portfolio" | "clients">("portfolio");
+  const [view, setView] = useState<
+    "portfolio" | "clients" | "team" | "templates" | "audit" | "admin"
+  >("portfolio");
   const [selectedClientId, setSelectedClientId] = useState<PublicId | null>(
     state.clients[0]?.id ?? null,
   );
@@ -774,8 +776,20 @@ function FirstRunWorkspace({
         <nav aria-label="Main navigation">
           <p className="nav-label">WORKSPACE</p>
           <Side active={view === "portfolio"} icon={<LayoutDashboard />} text="Dashboard" click={() => { setView("portfolio"); setMobileNavOpen(false); }} />
+          <Button
+            appearance="subtle"
+            disabled
+            aria-label="Annual-file workspace unavailable until an engagement is created"
+          >
+            <LockKeyhole />
+            <span>Annual-file workspace</span>
+          </Button>
           <p className="nav-label lower">MANAGE</p>
           <Side active={view === "clients"} icon={<Building2 />} text="Clients" click={() => { setView("clients"); setMobileNavOpen(false); }} />
+          <Side active={view === "team"} icon={<Users />} text="Team" click={() => { setView("team"); setMobileNavOpen(false); }} />
+          <Side active={view === "templates"} icon={<FolderOpen />} text="Templates" click={() => { setView("templates"); setMobileNavOpen(false); }} />
+          <Side active={view === "audit"} icon={<Activity />} text="Audit trail" click={() => { setView("audit"); setMobileNavOpen(false); }} />
+          <Side active={view === "admin"} icon={<ShieldCheck />} text="Administration" click={() => { setView("admin"); setMobileNavOpen(false); }} />
         </nav>
         <div className="sidebar-foot">
           <ShieldCheck />
@@ -819,12 +833,24 @@ function FirstRunWorkspace({
           <div className="top-actions"><Link href="/auth/sign-out" className="portal-link">Sign out</Link></div>
         </header>
         <nav className="breadcrumbs" aria-label="Breadcrumb">
-          <span><strong aria-current="page">{view === "portfolio" ? "Dashboard" : "Clients"}</strong></span>
+          <span>
+            <strong aria-current="page">
+              {{
+                portfolio: "Dashboard",
+                clients: "Clients",
+                team: "Team",
+                templates: "Templates",
+                audit: "Audit trail",
+                admin: "Administration",
+              }[view]}
+            </strong>
+          </span>
         </nav>
         {error && <div className="error-banner"><AlertTriangle />{error}</div>}
-        {view === "portfolio" ? (
+        {view === "portfolio" && (
           <Portfolio state={state} query="" open={() => undefined} create={() => setDialog({ kind: state.clients.length ? "engagement" : "client" })} />
-        ) : (
+        )}
+        {view === "clients" && (
           <Clients
             state={state}
             selectedId={selectedClientId}
@@ -840,6 +866,19 @@ function FirstRunWorkspace({
             notify={notify}
             openAnnual={() => undefined}
           />
+        )}
+        {view === "team" && (
+          <Team
+            state={state}
+            create={() => setDialog({ kind: "team" })}
+            mutate={mutate}
+            notify={notify}
+          />
+        )}
+        {view === "templates" && <Templates />}
+        {view === "audit" && <Audit state={state} />}
+        {view === "admin" && (
+          <Admin state={state} mutate={mutate} notify={notify} />
         )}
       </main>
       {dialog && (
