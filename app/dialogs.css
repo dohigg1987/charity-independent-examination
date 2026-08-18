@@ -1,0 +1,78 @@
+/* Authoritative dialog geometry. Keep this import last in app/layout.tsx. */
+.client-dialog-surface {
+  width: min(480px, calc(100vw - 32px));
+  max-width: 480px;
+  max-height: calc(100dvh - 32px);
+  padding: 22px !important;
+  overflow: hidden;
+  border: 1px solid #d7e4e4;
+  border-top: 3px solid #e66a35;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(32,56,69,.2);
+  box-sizing: border-box;
+}
+.client-dialog-form { width: 100%; min-width: 0; margin: 0; }
+.client-dialog-form > .fui-DialogBody {
+  display: grid !important;
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100dvh - 79px);
+  grid-template-columns: minmax(0,1fr) !important;
+  grid-template-rows: auto minmax(0,1fr) auto !important;
+  grid-template-areas: "title" "content" "actions" !important;
+  gap: 0 !important;
+}
+.client-dialog-form .fui-DialogTitle {
+  grid-area: title !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 0 14px;
+  color: #203845;
+  font: 600 20px/28px var(--font-primary);
+  box-sizing: border-box;
+}
+.client-dialog-form .fui-DialogTitle__action { align-self: start; margin: -2px -4px 0 12px; }
+.client-dialog-form .fui-DialogTitle__action > .fui-Button { width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; border-radius: 5px; }
+.client-dialog-content {
+  grid-area: content !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0 2px 18px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+.client-dialog-intro { margin: 0 0 15px; color: #5f737d; font-size: 12px; line-height: 18px; }
+.client-dialog-grid { display: grid; width: 100%; min-width: 0; grid-template-columns: minmax(0,1fr); gap: 11px; }
+.client-dialog-grid > .fui-Field { min-width: 0; gap: 5px; color: #435b65; font-size: 12px; font-weight: 600; }
+.client-dialog-grid > .client-dialog-wide { grid-column: 1; }
+.client-dialog-grid .fui-Input,.client-dialog-grid .fui-Select { width: 100%; min-width: 0; min-height: 36px; border-color: #b9cdcd; border-radius: 5px; background: #fff; }
+.client-dialog-grid .fui-Input:focus-within,.client-dialog-grid .fui-Select:focus-within { border-color: #00796f; box-shadow: 0 0 0 1px #00796f; }
+.client-dialog-grid .fui-Input > input,.client-dialog-grid .fui-Select > select { min-width: 0; min-height: 34px; padding: 6px 10px; border: 0 !important; outline: 0; background: transparent; color: #203845; font: 13px/20px var(--font-primary); }
+.client-dialog-form > .fui-DialogBody > .fui-DialogActions {
+  grid-area: actions !important;
+  grid-column: 1 !important;
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0;
+  max-width: none !important;
+  justify-content: flex-end !important;
+  justify-self: stretch !important;
+  gap: 8px;
+  margin: 0 !important;
+  padding: 16px 0 0;
+  border-top: 1px solid #d7e4e4;
+  background: #fff;
+  box-sizing: border-box;
+}
+.client-dialog-form .fui-DialogActions > .fui-Button { min-width: 104px; min-height: 36px; }
+@media(max-width:520px){
+  .client-dialog-surface{width:calc(100vw - 20px);max-height:calc(100dvh - 20px);padding:18px!important}
+  .client-dialog-form>.fui-DialogBody{max-height:calc(100dvh - 59px)}
+}
+@media(max-width:340px){.client-dialog-form .fui-DialogActions>.fui-Button{min-width:0;flex:1 1 0}}
