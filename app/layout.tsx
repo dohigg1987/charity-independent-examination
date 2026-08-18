@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ClarityFluentProvider } from "@/components/fluent/clarity-fluent-provider";
 import "./globals.css";
 import "./portal.css";
+import "./dialogs.css";
 
 export const metadata: Metadata = {
   title: "Clarity IE",
